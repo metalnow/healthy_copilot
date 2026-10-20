@@ -46,6 +46,13 @@
     // 每小時執行一次，由 dispatcher 依各使用者時區決定是否產生回顧 / 執行備份
     "crons": ["0 * * * *"]
   },
+  "routes": [
+    { "pattern": "healthy-copilot.mtlnow.xyz", "custom_domain": true }
+  ],
+  "vars": {
+    // 允許登入的 Email（逗號分隔）；空字串代表不限制
+    "ALLOWED_EMAILS": "shaune.jan@gmail.com"
+  },
   "observability": {
     "enabled": true
   }

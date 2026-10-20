@@ -77,10 +77,10 @@ Worker → Settings → Variables and Secrets，新增（類型選 Secret）：
 |---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client |
 | `MASTER_ENCRYPTION_KEY` | `openssl rand -base64 32`，請另外妥善保存，遺失後加密資料無法還原 |
-| `ALLOWED_EMAILS` | 你的 Gmail，例如 `you@gmail.com` |
 
-Google OAuth client 的 Authorized redirect URI 加入 `https://<你的網域>/api/auth/google/callback`
-（預設網域為 `https://healthy-copilot.<帳號子網域>.workers.dev`）。
+允許登入的帳號（`ALLOWED_EMAILS`）與自訂網域設定在 `wrangler.jsonc`，不要只在 Dashboard 修改，否則下次部署會被覆蓋。
+
+Google OAuth client 的 Authorized redirect URI 加入 `https://healthy-copilot.mtlnow.xyz/api/auth/google/callback`。
 
 ### 手動部署（不經 GitHub）
 

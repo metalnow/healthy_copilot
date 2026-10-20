@@ -6,8 +6,7 @@
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-# 允許登入的 Email，逗號分隔（個人部署建議設定；留空則不限制）
-ALLOWED_EMAILS=
+# ALLOWED_EMAILS 設定在 wrangler.jsonc 的 vars；本機要覆寫可在此設定
 
 # 主加密金鑰：32 bytes 的 base64，產生方式：openssl rand -base64 32
 MASTER_ENCRYPTION_KEY=
