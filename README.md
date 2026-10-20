@@ -39,21 +39,54 @@ npm run preview
 
 ## 部署到 Cloudflare
 
-第一次部署前建立資源：
+### 1. 建立資源（只需一次）
+
+在 Cloudflare Dashboard 或用 wrangler 建立：
+
+| 資源 | 名稱 |
+|---|---|
+| D1 | `healthy-copilot`（id 已填在 `wrangler.jsonc`） |
+| R2 bucket | `healthy-copilot-media` |
+| Queue | `healthy-copilot-ai`、`healthy-copilot-ai-dlq` |
 
 ```bash
-npx wrangler d1 create healthy-copilot          # 把回傳的 database_id 填入 wrangler.jsonc
 npx wrangler r2 bucket create healthy-copilot-media
 npx wrangler queues create healthy-copilot-ai
 npx wrangler queues create healthy-copilot-ai-dlq
+```
 
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put MASTER_ENCRYPTION_KEY    # openssl rand -base64 32，請另外妥善保存
-npx wrangler secret put ALLOWED_EMAILS           # 例如 you@gmail.com
+Binding 名稱以 `wrangler.jsonc` 為準（D1 為 `DB`、R2 為 `MEDIA`、Queue 為 `AI_QUEUE`），不需要在 Dashboard 另外設定。
 
+### 2. 連結 GitHub 自動部署（Workers Builds）
+
+Workers & Pages → Create → Import a repository，選 `metalnow/healthy_copilot`：
+
+| 欄位 | 值 |
+|---|---|
+| Project name | `healthy-copilot`（必須與 `wrangler.jsonc` 的 `name` 相同） |
+| Build command | `npx opennextjs-cloudflare build` |
+| Deploy command | `npm run cf:deploy`（先套用 D1 migration，再部署） |
+
+注意：Build command 不能用 `npm run build`，那只會跑 `next build`，不會產生 Worker 需要的 `.open-next/`。
+
+### 3. 設定 Secrets
+
+Worker → Settings → Variables and Secrets，新增（類型選 Secret）：
+
+| 名稱 | 值 |
+|---|---|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client |
+| `MASTER_ENCRYPTION_KEY` | `openssl rand -base64 32`，請另外妥善保存，遺失後加密資料無法還原 |
+| `ALLOWED_EMAILS` | 你的 Gmail，例如 `you@gmail.com` |
+
+Google OAuth client 的 Authorized redirect URI 加入 `https://<你的網域>/api/auth/google/callback`
+（預設網域為 `https://healthy-copilot.<帳號子網域>.workers.dev`）。
+
+### 手動部署（不經 GitHub）
+
+```bash
 npm run db:migrate:remote
 npm run deploy
 ```
 
-Cron Triggers、Queues 與較長的 CPU 時間需要 Workers 付費方案。
+Cron Triggers、Queues 與較長的 CPU 時間可能需要 Workers 付費方案。
