@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "healthy-copilot",
+  // 自訂 entry：包住 OpenNext 產生的 fetch handler，並加上 cron / queue handler。
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      // OpenNext 需要的 self-reference，service 名稱必須與 worker 名稱一致
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "healthy-copilot"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "healthy-copilot",
+      // 部署前以 `npx wrangler d1 create healthy-copilot` 建立，並填入回傳的 id
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      // 健檢報告、食物照片、睡眠截圖、語音檔
+      "binding": "MEDIA",
+      "bucket_name": "healthy-copilot-media"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "AI_QUEUE", "queue": "healthy-copilot-ai" }],
+    "consumers": [
+      {
+        "queue": "healthy-copilot-ai",
+        "max_batch_size": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "healthy-copilot-ai-dlq"
+      }
+    ]
+  },
+  "triggers": {
+    // 每小時執行一次，由 dispatcher 依各使用者時區決定是否產生回顧 / 執行備份
+    "crons": ["0 * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

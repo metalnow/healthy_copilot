@@ -1,0 +1,49 @@
+# 開發計劃（修正版）
+
+原始規格見 [spec-v1.md](./spec-v1.md)。本文件記錄對規格的修正與已確定的技術決策；兩者衝突時以本文件為準。
+
+## 已確定的決策
+
+| 項目 | 決策 |
+|---|---|
+| 部署 | Cloudflare Workers（`@opennextjs/cloudflare`） |
+| 資料庫 | Cloudflare D1（SQLite）+ Drizzle ORM；取代規格中的 PostgreSQL |
+| 物件儲存 | Cloudflare R2 |
+| 背景工作 | Cron Triggers（每小時 dispatcher）+ Queues；多步驟流程（備份）用 Workflows |
+| 登入 | 自建 Google OIDC（`arctic`）+ D1 server-side session；登入只要求 `openid email profile` |
+| 加密 | Envelope encryption：Worker secret 主金鑰包裝每位使用者的 DEK，AES-256-GCM（Web Crypto） |
+| 介面語言 | 只做繁體中文 |
+| 使用範圍 | 個人使用；可用 `ALLOWED_EMAILS` 限制可登入帳號 |
+
+## 對規格的修正
+
+1. **補齊資料結構**：所有事件表都有 `user_id`；補上 `FoodItem`、`NutritionEstimate`、`SleepSession`、`DrinkEvent`、`ActivityDaily` 等定義。見 `src/lib/schemas/` 與 `src/db/schema.ts`。
+2. **時區**：每筆事件存 UTC 時間、使用者當地日期（`local_date`）與 IANA 時區。所有每日 / 每週彙總以 `local_date` 為準。
+3. **飲料也有營養估算**：`drink_events.nutrition` 與食物相同，標記為 Estimated。
+4. **用藥排程**：`medication_schedules` 為「每天固定時刻 + 可選星期幾」，取代規格中的自由字串。
+5. **AI 擷取與確認資料分離**：`ai_extractions` 保存模型原始輸出，確認後的資料寫入各領域表並以 `extraction_id` 關聯；原始檔案存 R2，永不覆寫。
+6. **稽核紀錄**：`audit_logs` 只記錄動作與對象，不記錄健康內容。
+7. **Health Report PDF**：Workers 無法在伺服器端把 PDF 轉圖片。改為瀏覽器端用 pdf.js 轉成每頁圖片後上傳，原始 PDF 同樣存 R2；或直接送支援 PDF 的模型。
+8. **照片在瀏覽器端先縮圖**再上傳，減少流量與 AI token。
+9. **Drive 還原**：`drive.file` 只看得到同一 OAuth client 建立的檔案；換部署或 client 時需用 Google Picker 讓使用者選擇備份檔。
+10. **備份金鑰**：主金鑰只在伺服器時，伺服器資料遺失會讓 Drive 備份無法解密。Sprint 7 需同時提供使用者自行保管的復原金鑰（或可匯出金鑰）。
+
+## Sprint 規劃
+
+| Sprint | 內容 | 狀態 |
+|---|---|---|
+| 0 Foundation | Next.js + OpenNext + Wrangler、D1 schema 與 migration、Zod schema、時區工具、加密工具、稽核紀錄、CI | ✅ |
+| 1 Auth & Shell | Google 登入、session、使用者初始化（DEK、預設設定）、主導覽與頁面骨架 | ✅（基本版） |
+| 2 Daily Tracking | 體重 / 血壓 / 心率 / 腰圍、文字輸入飲食與飲水、用藥定義與打勾、**Safety Rule：血壓閾值** | |
+| 3 AI Gateway | OpenRouter、Model Profile 設定、Zod 驗證與重試、信心值 / 確認流程、食物照片、語音（先做 spike 驗證 OpenRouter 音訊輸入） | |
+| 4 Health Records | 報告上傳（pdf.js 轉圖）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | |
+| 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | |
+| 6 Insight | 彙總服務、週回顧、趨勢圖、Today Focus、AI 洞察 | |
+| 7 Google Drive | Drive 授權、加密備份、手動 / 自動備份、還原（含 Picker）、資料匯出與刪除 | |
+
+## 待驗證的技術風險
+
+- OpenRouter 的語音輸入能力與品質；備案為 Workers AI Whisper（需決定是否接受）。
+- 含媒體的備份需串流壓縮與 Drive resumable upload，避免超過 Workers 128MB 記憶體。
+- 送往 OpenRouter 的請求需限定不留存資料的供應商，並移除姓名等身分資訊。
+- 若使用 Cloudflare AI Gateway，必須關閉 prompt logging。

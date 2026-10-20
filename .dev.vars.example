@@ -1,0 +1,16 @@
+# 複製為 .dev.vars（本機開發用，不可 commit）
+# 正式環境請用 `npx wrangler secret put <NAME>` 設定
+
+# Google OAuth（Web application client），Authorized redirect URI 設為 <網站網址>/api/auth/google/callback
+# 本機開發：http://localhost:3000/api/auth/google/callback
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# 允許登入的 Email，逗號分隔（個人部署建議設定；留空則不限制）
+ALLOWED_EMAILS=
+
+# 主加密金鑰：32 bytes 的 base64，產生方式：openssl rand -base64 32
+MASTER_ENCRYPTION_KEY=
+
+# Sprint 3 起使用
+OPENROUTER_API_KEY=
