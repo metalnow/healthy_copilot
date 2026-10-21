@@ -1,0 +1,17 @@
+# 複製為 .dev.vars（本機開發用，不可 commit）
+# 正式環境請用 `npx wrangler secret put <NAME>` 設定
+
+# Google OAuth（Web application client），Authorized redirect URI 設為 <網站網址>/api/auth/google/callback
+# 本機開發：http://localhost:3000/api/auth/google/callback
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# ALLOWED_EMAILS 設定在 wrangler.jsonc 的 vars；本機要覆寫可在此設定
+
+# 主加密金鑰：32 bytes 的 base64，產生方式：openssl rand -base64 32
+MASTER_ENCRYPTION_KEY=
+
+# OpenRouter（AI 功能）：https://openrouter.ai/settings/keys
+OPENROUTER_API_KEY=
+# 僅本機測試用：指向假的 OpenRouter；正式環境不要設定
+# OPENROUTER_BASE_URL=http://localhost:9999

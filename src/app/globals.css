@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f5;
+  --surface: #ffffff;
+  --foreground: #1c1c1a;
+  --muted: #6b6b66;
+  --border: #e4e4df;
+  --accent: #2f7d5b;
+  --accent-foreground: #ffffff;
+  --warning: #b45309;
+  /* 圖表資料色（已用 dataviz validator 驗證對比與色盲區辨） */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --grid: #ecece8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121211;
+    --surface: #1c1c1a;
+    --foreground: #ececea;
+    --muted: #a1a19b;
+    --border: #2e2e2b;
+    --accent: #5fbf8f;
+    --accent-foreground: #0d1f16;
+    --warning: #f59e0b;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --grid: #2a2a27;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-warning: var(--warning);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-grid: var(--grid);
+  --font-sans:
+    system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

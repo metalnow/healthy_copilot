@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - name: Check migrations are up to date
+        run: |
+          npx drizzle-kit generate --name ci-check
+          git diff --exit-code --stat drizzle/ || (echo "schema.ts 有變更但未產生 migration，請執行 npm run db:generate" && exit 1)
+          test -z "$(git status --porcelain drizzle/)"
+      - name: Build Cloudflare worker
+        run: npm run cf:build
+      - name: Validate worker bundle
+        run: npx wrangler deploy --dry-run --outdir .wrangler/dry-run
