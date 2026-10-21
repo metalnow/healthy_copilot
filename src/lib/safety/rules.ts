@@ -65,3 +65,69 @@ export function evaluateHeartRate(bpm: number): SafetyAlert | null {
   }
   return null;
 }
+
+/** 症狀 / 事件的危險訊號（依類型與嚴重度 1–5） */
+export function evaluateSymptom(symptom: { type: string; severity: number }): SafetyAlert | null {
+  const { type, severity } = symptom;
+  switch (type) {
+    case "chest_pain":
+      return {
+        ruleId: "symptom_chest_pain",
+        level: "emergency",
+        title: "胸痛",
+        message:
+          "胸痛可能是心臟或血管的急症。若胸口有壓迫感、疼痛超過數分鐘、延伸到手臂 / 下巴 / 背部，" +
+          "或伴隨冒冷汗、呼吸困難、噁心、頭暈，請立即撥打 119，不要自行開車就醫。",
+      };
+    case "dyspnea":
+      return {
+        ruleId: "symptom_dyspnea",
+        level: severity >= 3 ? "emergency" : "urgent",
+        title: "呼吸困難",
+        message:
+          "休息時仍喘不過氣、說話困難、嘴唇發紫或伴隨胸痛時，請立即撥打 119。" +
+          "症狀較輕但持續或反覆發生，請盡快就醫評估。",
+      };
+    case "syncope":
+      return {
+        ruleId: "symptom_syncope",
+        level: "urgent",
+        title: "暈厥 / 昏倒",
+        message:
+          "發生過昏倒請盡快就醫評估原因。若昏倒時受傷、伴隨胸痛、心悸、呼吸困難，或意識未完全恢復，請立即撥打 119。",
+      };
+    case "allergic_reaction":
+    case "hives":
+      if (type === "allergic_reaction" ? severity >= 3 : severity >= 4) {
+        return {
+          ruleId: "symptom_anaphylaxis_risk",
+          level: "emergency",
+          title: "可能是嚴重過敏反應",
+          message:
+            "若出現喉嚨緊縮、呼吸困難或喘鳴、嘴唇 / 舌頭 / 臉部腫脹、頭暈或快要昏倒，可能是過敏性休克：" +
+            "有腎上腺素自動注射筆請立即使用，並撥打 119。",
+        };
+      }
+      return null;
+    case "palpitations":
+      return severity >= 4
+        ? {
+            ruleId: "symptom_palpitations",
+            level: "caution",
+            title: "明顯心悸",
+            message: "心悸若伴隨胸痛、呼吸困難、頭暈或昏倒，請立即撥打 119；持續或反覆發生請盡快就醫。",
+          }
+        : null;
+    case "fever":
+      return severity >= 4
+        ? {
+            ruleId: "symptom_high_fever",
+            level: "caution",
+            title: "高燒",
+            message: "高燒不退、意識改變、頸部僵硬、呼吸急促或出現紫斑時，請盡快就醫或撥打 119。",
+          }
+        : null;
+    default:
+      return null;
+  }
+}

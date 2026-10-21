@@ -175,7 +175,7 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
             onChange={(e) => setText(e.target.value)}
             rows={4}
             maxLength={1000}
-            placeholder="例如：早餐吃了兩顆水煮蛋和一杯美式咖啡，剛量血壓 128/82"
+            placeholder="例如：早餐吃了兩顆水煮蛋和一杯美式咖啡，飯後走路 20 分鐘，剛量血壓 128/82"
             aria-label="描述吃了什麼、喝了什麼或量測結果"
             className={inputClass}
           />

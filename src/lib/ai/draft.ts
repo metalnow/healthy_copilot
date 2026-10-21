@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { DRINK_TYPES, MEAL_TYPES, type MealType } from "@/lib/enums";
+import { DRINK_TYPES, EXERCISE_TYPES, INTENSITIES, MEAL_TYPES, type MealType } from "@/lib/enums";
+import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import { NutritionEstimateSchema, type NutritionEstimate } from "@/lib/schemas/common";
 import { OBSERVATION_TYPES, OBSERVATION_VALUE_SCHEMAS } from "@/lib/schemas/observation";
 import { fromDateTimeLocalValue, toDateTimeLocalValue, toLocalDate } from "@/lib/time";
@@ -45,6 +46,24 @@ export const DraftEventSchema = z.discriminatedUnion("kind", [
     kind: z.literal("measurement"),
     measurementType: z.enum(OBSERVATION_TYPES),
     values: z.record(z.string(), z.number()),
+    occurredAt: DateTimeLocal,
+    confidence: Confidence.optional(),
+  }),
+  z.object({
+    kind: z.literal("exercise"),
+    exerciseType: z.enum(EXERCISE_TYPES),
+    durationMin: z.number().min(1, "請輸入運動時間").max(1440),
+    intensity: z.enum(INTENSITIES).optional(),
+    afterMeal: z.boolean().optional(),
+    occurredAt: DateTimeLocal,
+    confidence: Confidence.optional(),
+  }),
+  z.object({
+    kind: z.literal("symptom"),
+    symptomType: z.enum(SYMPTOM_TYPES),
+    severity: z.number().int().min(1).max(5),
+    durationMin: z.number().int().min(1).max(10080).optional(),
+    note: z.string().trim().max(500).optional(),
     occurredAt: DateTimeLocal,
     confidence: Confidence.optional(),
   }),
@@ -189,6 +208,28 @@ export function draftFromTextParse(result: TextParseResult, now: Date, timeZone:
         kcal: nonNegative(event.drinkKcal),
         occurredAt: resolveOccurredAt(event, now, timeZone),
         confidence: volumeKnown ? confidence : Math.min(confidence, 0.5),
+      });
+    } else if (event.kind === "exercise") {
+      const duration = event.durationMin != null && event.durationMin > 0 ? Math.round(event.durationMin) : null;
+      if (!duration) continue;
+      drafts.push({
+        kind: "exercise",
+        exerciseType: event.exerciseType ?? "other",
+        durationMin: duration,
+        intensity: event.intensity ?? undefined,
+        afterMeal: event.afterMeal ?? undefined,
+        occurredAt: resolveOccurredAt(event, now, timeZone),
+        confidence,
+      });
+    } else if (event.kind === "symptom" && event.symptomType) {
+      drafts.push({
+        kind: "symptom",
+        symptomType: event.symptomType,
+        severity: Math.min(5, Math.max(1, Math.round(event.severity ?? 2))),
+        durationMin: event.durationMin != null && event.durationMin > 0 ? Math.round(event.durationMin) : undefined,
+        note: event.note?.trim().slice(0, 500) || undefined,
+        occurredAt: resolveOccurredAt(event, now, timeZone),
+        confidence,
       });
     } else if (event.kind === "measurement" && event.measurementType) {
       const values = measurementValues(event);

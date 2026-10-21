@@ -8,20 +8,24 @@ import { countDone } from "@/lib/medication/checklist";
 import {
   evaluateBloodPressure,
   evaluateHeartRate,
+  evaluateSymptom,
   type SafetyAlert,
 } from "@/lib/safety/rules";
 import { OBSERVATION_TYPES, type ObservationType } from "@/lib/schemas/observation";
+import { formatDuration, sleepDurationMin } from "@/lib/sleep";
 import { toLocalDate } from "@/lib/time";
 import { listDrinksForDate, listFoodForDate } from "@/server/food";
+import { lifestyleForRange, recentSymptoms, type SymptomRow } from "@/server/lifestyle";
 import { getChecklist } from "@/server/medications";
 import {
   latestObservations,
   listObservationsForDate,
   type ObservationRow,
 } from "@/server/observations";
+import { getTimeline } from "@/server/timeline";
+import { EntryList } from "./_components/entry-list";
 import { MedicationChecklist } from "./_components/medication-checklist";
 import { SafetyBanner } from "./_components/safety-banner";
-import { buildEntries, TodayEntries } from "./_components/today-entries";
 
 const QUICK_ADD = [
   { href: "/log/measurement/weight", label: "體重" },
@@ -30,6 +34,10 @@ const QUICK_ADD = [
   { href: "/log/measurement/waist", label: "腰圍" },
   { href: "/log/food", label: "飲食" },
   { href: "/log/drink", label: "飲水" },
+  { href: "/log/sleep", label: "睡眠" },
+  { href: "/log/activity", label: "步數" },
+  { href: "/log/exercise", label: "運動" },
+  { href: "/log/symptom", label: "症狀" },
 ] as const;
 
 const AI_MODES = [
@@ -38,19 +46,25 @@ const AI_MODES = [
   { mode: "text", label: "⌨️ 打一句" },
 ] as const;
 
-/** 依今天最新一筆血壓 / 心率套用固定規則 */
-function todaySafetyAlerts(todayObservations: ObservationRow[]): SafetyAlert[] {
+const STEP_GOAL = 8000;
+
+/** 固定規則：今天最新一筆血壓 / 心率，以及最近 24 小時的症狀 */
+function safetyAlerts(todayObservations: ObservationRow[], symptoms: SymptomRow[]): SafetyAlert[] {
   const latestOf = (type: ObservationType) => todayObservations.find((o) => o.type === type);
   const bp = latestOf("blood_pressure");
   const hr = latestOf("heart_rate");
-  return [
+  const alerts = [
     bp &&
       evaluateBloodPressure({
         systolic: Number(bp.values.systolic),
         diastolic: Number(bp.values.diastolic),
       }),
     hr && evaluateHeartRate(Number(hr.values.bpm)),
+    ...symptoms.map((s) => evaluateSymptom(s)),
   ].filter((a): a is SafetyAlert => Boolean(a));
+  // 同一規則只顯示一次，最嚴重的在前
+  const order = { emergency: 0, urgent: 1, caution: 2 };
+  return [...new Map(alerts.map((a) => [a.ruleId, a])).values()].sort((a, b) => order[a.level] - order[b.level]);
 }
 
 function MetricCard({
@@ -92,17 +106,24 @@ export default async function TodayPage() {
   const today = toLocalDate(new Date(), user.timezone);
   const db = await getDb();
 
-  const [latest, todayObservations, food, drinks, checklist] = await Promise.all([
+  const [latest, todayObservations, food, drinks, checklist, lifestyle, symptoms, entries] = await Promise.all([
     latestObservations(db, user.id),
     listObservationsForDate(db, user.id, today),
     listFoodForDate(db, user.id, today),
     listDrinksForDate(db, user.id, today),
     getChecklist(db, user.id, today),
+    lifestyleForRange(db, user.id, today, today),
+    recentSymptoms(db, user.id),
+    getTimeline(db, user, today, today),
   ]);
 
   const waterMl = drinks.reduce((sum, d) => sum + (d.waterMl ?? 0), 0);
   const otherDrinks = drinks.filter((d) => d.drinkType !== "water").length;
   const medsDone = countDone(checklist);
+  const steps = Math.max(0, ...lifestyle.activity.map((a) => a.steps ?? 0));
+  const lastNight = lifestyle.sleep[0];
+  const sleepMin = lastNight ? sleepDurationMin(lastNight) : null;
+  const exerciseMin = lifestyle.exercise.reduce((sum, e) => sum + e.durationMin, 0);
 
   return (
     <div className="space-y-6">
@@ -111,7 +132,7 @@ export default async function TodayPage() {
         <p className="text-sm text-muted">{today}</p>
       </div>
 
-      <SafetyBanner alerts={todaySafetyAlerts(todayObservations)} />
+      <SafetyBanner alerts={safetyAlerts(todayObservations, symptoms)} />
 
       <nav aria-label="AI 快速記錄" className="grid grid-cols-3 gap-2">
         {AI_MODES.map((item) => (
@@ -125,14 +146,14 @@ export default async function TodayPage() {
         ))}
       </nav>
 
-      <nav aria-label="快速記錄" className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      <nav aria-label="快速記錄" className="grid grid-cols-5 gap-2">
         {QUICK_ADD.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className="rounded-lg border border-border bg-surface px-2 py-2 text-center text-sm hover:border-accent"
+            className="rounded-lg border border-border bg-surface px-1 py-2 text-center text-sm hover:border-accent"
           >
-            ＋ {item.label}
+            {item.label}
           </Link>
         ))}
       </nav>
@@ -157,6 +178,19 @@ export default async function TodayPage() {
             );
           })}
           <MetricCard
+            label="步數"
+            href="/log/activity"
+            value={steps > 0 ? `${steps.toLocaleString("zh-TW")} / ${STEP_GOAL.toLocaleString("zh-TW")}` : "尚未記錄"}
+            sub={exerciseMin > 0 ? `運動 ${Math.round(exerciseMin)} 分鐘` : undefined}
+            muted={steps === 0}
+          />
+          <MetricCard
+            label="睡眠"
+            href="/log/sleep"
+            value={lastNight ? formatDuration(sleepMin) : "尚未記錄"}
+            muted={!lastNight}
+          />
+          <MetricCard
             label="飲食"
             href="/log/food"
             value={food.length > 0 ? `${food.length} 筆` : "尚未記錄"}
@@ -175,14 +209,22 @@ export default async function TodayPage() {
             value={checklist.length > 0 ? `${medsDone} / ${checklist.length}` : "今日無"}
             muted={checklist.length === 0}
           />
-          <MetricCard label="步數" value="Sprint 5 開放" muted />
-          <MetricCard label="睡眠" value="Sprint 5 開放" muted />
         </dl>
       </section>
 
       <MedicationChecklist items={checklist} localDate={today} timeZone={user.timezone} />
 
-      <TodayEntries entries={buildEntries(todayObservations, food, drinks)} timeZone={user.timezone} />
+      <section aria-labelledby="entries-heading" className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 id="entries-heading" className="font-medium">
+            今日紀錄
+          </h2>
+          <Link href="/timeline" className="text-sm text-accent">
+            時間軸
+          </Link>
+        </div>
+        {entries.length === 0 ? <p className="text-sm text-muted">今天還沒有紀錄。</p> : <EntryList items={entries} />}
+      </section>
 
       <ComingSoon
         title="AI 洞察"

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDb } from "@/db";
+import type { Db } from "@/db/client";
 import { recordAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/dal";
 import { DRINK_TYPES, MEAL_TYPES, type MealType } from "@/lib/enums";
@@ -20,7 +21,9 @@ import {
   type FoodItemDraft,
 } from "@/server/food";
 import { clearMedicationEvent, recordMedicationEvent } from "@/server/medications";
+import { deleteLifestyleEntry } from "@/server/lifestyle";
 import { addObservation, deleteObservation } from "@/server/observations";
+import { DELETABLE_KINDS, type DeletableKind } from "@/server/timeline";
 
 // 所有 action 都可能被直接 POST 呼叫：一律先 requireUser()，資料操作以 user.id 限定。
 
@@ -136,24 +139,27 @@ export async function saveDrink(_prev: ActionState, formData: FormData): Promise
   redirect("/");
 }
 
-const ENTRY_KINDS = ["observation", "food_event", "drink_event"] as const;
-
 export async function deleteEntry(formData: FormData) {
   const user = await requireUser();
-  const kind = z.enum(ENTRY_KINDS).safeParse(formString(formData, "kind"));
+  const kind = z.enum(DELETABLE_KINDS).safeParse(formString(formData, "kind"));
   const id = formString(formData, "id");
   if (!kind.success || !id) return;
 
   const db = await getDb();
-  const remove = {
+  const remove: Record<DeletableKind, (db: Db, userId: string, id: string) => Promise<boolean>> = {
     observation: deleteObservation,
     food_event: deleteFoodEvent,
     drink_event: deleteDrinkEvent,
-  }[kind.data];
-  if (await remove(db, user.id, id)) {
+    sleep: (d, u, i) => deleteLifestyleEntry(d, u, "sleep", i),
+    activity: (d, u, i) => deleteLifestyleEntry(d, u, "activity", i),
+    exercise: (d, u, i) => deleteLifestyleEntry(d, u, "exercise", i),
+    symptom: (d, u, i) => deleteLifestyleEntry(d, u, "symptom", i),
+  };
+  if (await remove[kind.data](db, user.id, id)) {
     await recordAudit(db, { userId: user.id, action: `${kind.data}.delete`, entityId: id });
   }
   revalidatePath("/");
+  revalidatePath("/timeline");
 }
 
 export async function updateMedicationCheck(formData: FormData) {

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { DRINK_TYPES, MEAL_TYPES } from "@/lib/enums";
+import { DRINK_TYPES, EXERCISE_TYPES, INTENSITIES, MEAL_TYPES } from "@/lib/enums";
+import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import { OBSERVATION_TYPES } from "@/lib/schemas/observation";
 
 // AI 輸出用的 schema：所有欄位必填、無值用 null、不加數值範圍限制，
@@ -39,7 +40,7 @@ export const FoodPhotoResultSchema = z.strictObject({
 });
 export type FoodPhotoResult = z.infer<typeof FoodPhotoResultSchema>;
 
-export const AI_EVENT_KINDS = ["food", "drink", "measurement"] as const;
+export const AI_EVENT_KINDS = ["food", "drink", "measurement", "exercise", "symptom"] as const;
 
 /** 扁平結構：依 kind 使用對應欄位，其餘填 null（比 union 更容易被各模型正確輸出） */
 export const AiEventSchema = z.strictObject({
@@ -66,12 +67,21 @@ export const AiEventSchema = z.strictObject({
   pulse: num,
   bpm: num,
   waistCm: num,
+
+  exerciseType: z.enum(EXERCISE_TYPES).nullable().describe("kind=exercise 時的運動類型"),
+  durationMin: num.describe("kind=exercise 或 symptom 時的持續分鐘數"),
+  intensity: z.enum(INTENSITIES).nullable().describe("kind=exercise 時的強度"),
+  afterMeal: z.boolean().nullable().describe("kind=exercise 時是否為飯後運動"),
+
+  symptomType: z.enum(SYMPTOM_TYPES).nullable().describe("kind=symptom 時的症狀或生活事件類型"),
+  severity: num.describe("kind=symptom 時的嚴重度 1–5"),
+  note: z.string().nullable().describe("kind=symptom 時的簡短描述"),
 });
 export type AiEvent = z.infer<typeof AiEventSchema>;
 
 export const TextParseResultSchema = z.strictObject({
   events: z.array(AiEventSchema),
-  unparsed: z.string().nullable().describe("無法歸類為飲食、飲料或量測的內容，原文保留；沒有則填 null"),
+  unparsed: z.string().nullable().describe("無法歸類的內容，原文保留；沒有則填 null"),
 });
 export type TextParseResult = z.infer<typeof TextParseResultSchema>;
 
@@ -105,3 +115,20 @@ export const LabExtractionSchema = z.strictObject({
   notes: z.string().nullable().describe("給使用者的補充，例如模糊無法辨識的頁面"),
 });
 export type LabExtraction = z.infer<typeof LabExtractionSchema>;
+
+export const SleepScreenshotSchema = z.strictObject({
+  isSleepData: z.boolean().describe("截圖是否為睡眠紀錄"),
+  wakeDate: z.string().nullable().describe("起床日期 YYYY-MM-DD；截圖沒有日期填 null"),
+  sleepStart: z.string().nullable().describe("入睡時刻 HH:mm（24 小時制）"),
+  sleepEnd: z.string().nullable().describe("起床時刻 HH:mm（24 小時制）"),
+  totalSleepMin: z.number().nullable().describe("總睡眠分鐘數"),
+  awakeMin: z.number().nullable(),
+  deepMin: z.number().nullable(),
+  remMin: z.number().nullable(),
+  lightMin: z.number().nullable(),
+  avgHeartRate: z.number().nullable().describe("睡眠期間平均心率"),
+  hrvMs: z.number().nullable().describe("HRV（毫秒）"),
+  confidence: z.number().describe("整體信心 0–1"),
+  notes: z.string().nullable(),
+});
+export type SleepScreenshot = z.infer<typeof SleepScreenshotSchema>;

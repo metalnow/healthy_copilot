@@ -44,6 +44,13 @@ const baseEvent: AiEvent = {
   pulse: null,
   bpm: null,
   waistCm: null,
+  exerciseType: null,
+  durationMin: null,
+  intensity: null,
+  afterMeal: null,
+  symptomType: null,
+  severity: null,
+  note: null,
 };
 
 describe("resolveOccurredAt", () => {
@@ -135,6 +142,27 @@ describe("draftFromTextParse", () => {
       TZ,
     );
     expect(drink).toMatchObject({ volumeMl: 250, confidence: 0.5 });
+  });
+});
+
+describe("draftFromTextParse：運動與症狀", () => {
+  it("飯後散步 20 分鐘、有點頭痛", () => {
+    const drafts = draftFromTextParse(
+      {
+        events: [
+          { ...baseEvent, kind: "exercise", exerciseType: "walking", durationMin: 20, afterMeal: true },
+          { ...baseEvent, kind: "symptom", symptomType: "headache", severity: 2.4, note: "太陽穴" },
+          { ...baseEvent, kind: "exercise", exerciseType: "running", durationMin: null },
+        ],
+        unparsed: null,
+      },
+      now,
+      TZ,
+    );
+    expect(drafts).toEqual([
+      expect.objectContaining({ kind: "exercise", exerciseType: "walking", durationMin: 20, afterMeal: true }),
+      expect.objectContaining({ kind: "symptom", symptomType: "headache", severity: 2, note: "太陽穴" }),
+    ]);
   });
 });
 

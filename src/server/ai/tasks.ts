@@ -9,11 +9,12 @@ import {
   type DraftEvent,
 } from "@/lib/ai/draft";
 import { AiError, transcribe, type OpenRouterConfig } from "@/lib/ai/openrouter";
-import { FOOD_PHOTO_SYSTEM_PROMPT, textParseSystemPrompt } from "@/lib/ai/prompts";
-import { FoodPhotoResultSchema, TextParseResultSchema } from "@/lib/ai/schemas";
+import { FOOD_PHOTO_SYSTEM_PROMPT, SLEEP_SCREENSHOT_SYSTEM_PROMPT, textParseSystemPrompt } from "@/lib/ai/prompts";
+import { FoodPhotoResultSchema, SleepScreenshotSchema, TextParseResultSchema } from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
 import type { AI_TASKS } from "@/lib/enums";
 import { WEEKDAY_LABELS } from "@/lib/labels";
+import { resolveSleepTimes } from "@/lib/sleep";
 import { toDateTimeLocalValue, toLocalDate, weekdayOfLocalDate } from "@/lib/time";
 import { putMedia } from "@/server/media";
 import { openRouterConfig } from "./config";
@@ -25,6 +26,18 @@ import {
 } from "./extractions";
 import { getModelProfile } from "./model-profiles";
 
+export type SleepDraft = {
+  sleepStartAt?: string;
+  wakeAt?: string;
+  totalSleepMin?: number;
+  awakeMin?: number;
+  deepMin?: number;
+  remMin?: number;
+  lightMin?: number;
+  avgHeartRate?: number;
+  hrvMs?: number;
+};
+
 export type AiTaskResult = {
   extractionId: string;
   task: (typeof AI_TASKS)[number];
@@ -32,6 +45,10 @@ export type AiTaskResult = {
   transcript?: string;
   notes?: string;
   unparsed?: string;
+  /** 睡眠截圖的擷取結果（task = sleep_screenshot） */
+  sleep?: SleepDraft;
+  confidence?: number;
+  mediaId?: string;
 };
 
 type Env = Pick<CloudflareEnv, "MEDIA" | "OPENROUTER_API_KEY" | "OPENROUTER_BASE_URL">;
@@ -243,6 +260,64 @@ export async function transcribeAndParse(
       parsedOutput: { transcript: transcription.text, ...parsed.data, mediaId },
       rawOutput: parsed.raw,
       confidence: parsed.confidence,
+    };
+  });
+}
+
+const positive = (n: number | null) => (n !== null && n >= 0 ? Math.round(n) : undefined);
+
+export async function analyzeSleepScreenshot(
+  db: Db,
+  env: Env,
+  user: SessionUser,
+  image: { bytes: Uint8Array<ArrayBuffer>; mimeType: string; filename?: string },
+): Promise<AiTaskResult> {
+  const mediaId = await putMedia(db, env.MEDIA, user.id, { kind: "sleep_screenshot", ...image });
+
+  return runTask(db, env, user, { task: "sleep_screenshot", primaryProfile: "vision", mediaIds: [mediaId] }, async ({ config, steps }) => {
+    const profile = await getModelProfile(db, "vision");
+    const response = await generateStructured(config, {
+      model: profile.modelId,
+      temperature: 0,
+      maxTokens: profile.maxTokens,
+      system: SLEEP_SCREENSHOT_SYSTEM_PROMPT,
+      user: [
+        { type: "text", text: "請讀出這張截圖中的睡眠資料。" },
+        { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${toBase64(image.bytes)}` } },
+      ],
+      schema: SleepScreenshotSchema,
+      schemaName: "sleep_screenshot",
+    });
+    steps.push({ profile: "vision", modelId: response.model, ...response.usage });
+
+    const data = response.data;
+    const times = data.isSleepData
+      ? resolveSleepTimes({ wakeDate: data.wakeDate, sleepStart: data.sleepStart, sleepEnd: data.sleepEnd }, new Date(), user.timezone)
+      : null;
+    const toLocal = (d: Date | null | undefined) => (d ? toDateTimeLocalValue(d, user.timezone) : undefined);
+    return {
+      result: {
+        drafts: [],
+        mediaId,
+        confidence: Math.min(1, Math.max(0, data.confidence)),
+        notes: data.isSleepData ? (data.notes ?? undefined) : "截圖看起來不是睡眠紀錄。",
+        sleep: data.isSleepData
+          ? {
+              sleepStartAt: toLocal(times?.sleepStartAt),
+              wakeAt: toLocal(times?.wakeAt),
+              totalSleepMin: positive(data.totalSleepMin),
+              awakeMin: positive(data.awakeMin),
+              deepMin: positive(data.deepMin),
+              remMin: positive(data.remMin),
+              lightMin: positive(data.lightMin),
+              avgHeartRate: positive(data.avgHeartRate),
+              hrvMs: positive(data.hrvMs),
+            }
+          : undefined,
+      },
+      parsedOutput: { ...data, mediaId },
+      rawOutput: response.raw,
+      confidence: data.confidence,
     };
   });
 }

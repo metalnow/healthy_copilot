@@ -3,8 +3,16 @@
 import { useState, useTransition } from "react";
 import { ChipGroup, FormError, inputClass } from "@/components/form";
 import { LOW_CONFIDENCE, type DraftEvent, type DraftFoodItem } from "@/lib/ai/draft";
-import { DRINK_TYPES, MEAL_TYPES } from "@/lib/enums";
-import { DRINK_TYPE_LABELS, MEAL_TYPE_LABELS, OBSERVATION_LABELS } from "@/lib/labels";
+import { DRINK_TYPES, EXERCISE_TYPES, MEAL_TYPES } from "@/lib/enums";
+import {
+  DRINK_TYPE_LABELS,
+  EXERCISE_TYPE_LABELS,
+  MEAL_TYPE_LABELS,
+  OBSERVATION_LABELS,
+  SEVERITY_LABELS,
+  SYMPTOM_LABELS,
+} from "@/lib/labels";
+import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import type { ObservationType } from "@/lib/schemas/observation";
 import type { AiTaskResult } from "@/server/ai/tasks";
 import { confirmAiDraft, discardAiDraft } from "./actions";
@@ -127,7 +135,11 @@ function EventCard({
       ? "飲食"
       : event.kind === "drink"
         ? "飲料"
-        : OBSERVATION_LABELS[event.measurementType];
+        : event.kind === "exercise"
+          ? "運動"
+          : event.kind === "symptom"
+            ? "症狀 / 事件"
+            : OBSERVATION_LABELS[event.measurementType];
 
   return (
     <section
@@ -212,6 +224,70 @@ function EventCard({
             </>
           )}
 
+          {event.kind === "exercise" && (
+            <>
+              <ChipGroup
+                name={`exercise-${event.key}`}
+                label="運動類型"
+                value={event.exerciseType}
+                onChange={(exerciseType) => update({ exerciseType })}
+                options={EXERCISE_TYPES.map((t) => ({ value: t, label: EXERCISE_TYPE_LABELS[t] }))}
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={Number.isNaN(event.durationMin) ? "" : event.durationMin}
+                  onChange={(e) => update({ durationMin: e.target.valueAsNumber })}
+                  aria-label="運動分鐘數"
+                  className={`${inputClass} w-28`}
+                />
+                <span className="text-sm text-muted">分鐘</span>
+                <label className="ml-auto flex items-center gap-1 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={event.afterMeal ?? false}
+                    onChange={(e) => update({ afterMeal: e.target.checked })}
+                    className="size-4 accent-accent"
+                  />
+                  飯後
+                </label>
+              </div>
+            </>
+          )}
+
+          {event.kind === "symptom" && (
+            <>
+              <select
+                value={event.symptomType}
+                onChange={(e) => update({ symptomType: e.target.value as typeof event.symptomType })}
+                aria-label="症狀類型"
+                className={inputClass}
+              >
+                {SYMPTOM_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {SYMPTOM_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              <ChipGroup
+                name={`severity-${event.key}`}
+                label="嚴重度"
+                value={String(event.severity) as "1" | "2" | "3" | "4" | "5"}
+                onChange={(v) => update({ severity: Number(v) })}
+                options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n) as "1", label: `${n} ${SEVERITY_LABELS[n]}` }))}
+              />
+              <input
+                value={event.note ?? ""}
+                onChange={(e) => update({ note: e.target.value || undefined })}
+                placeholder="描述（選填）"
+                aria-label="症狀描述"
+                maxLength={500}
+                className={inputClass}
+              />
+            </>
+          )}
+
           {event.kind === "measurement" && (
             <div className="grid grid-cols-2 gap-2">
               {MEASUREMENT_FIELDS[event.measurementType].map((field) => (
@@ -283,7 +359,7 @@ export function DraftEditor({ result, onReset }: { result: AiTaskResult; onReset
       {result.notes && <p className="text-sm text-muted">{result.notes}</p>}
       {result.unparsed && (
         <p className="text-sm text-muted">
-          未能歸類的內容：{result.unparsed}（症狀紀錄將於 Sprint 5 開放）
+          未能歸類的內容：{result.unparsed}
         </p>
       )}
 

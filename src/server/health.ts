@@ -15,6 +15,7 @@ import {
 import type { SessionUser } from "@/lib/auth/session";
 import { goalDirection } from "@/lib/goals";
 import { toLabObservationValues, type ConfirmLabs, type LabDraftItem } from "@/lib/labs/review";
+import { sleepDurationMin } from "@/lib/sleep";
 import { toLocalDate } from "@/lib/time";
 import { settleExtraction } from "@/server/ai/extractions";
 
@@ -247,12 +248,10 @@ export async function currentMetricValue(
   }
   if (metric === "SLEEP_HOURS_AVG_7D") {
     const rows = await db
-      .select({ minutes: sleepSessions.totalSleepMin, start: sleepSessions.sleepStartAt, bed: sleepSessions.bedtimeAt, wake: sleepSessions.wakeAt })
+      .select()
       .from(sleepSessions)
       .where(and(eq(sleepSessions.userId, user.id), gte(sleepSessions.localDate, since)));
-    const minutes = rows
-      .map((r) => r.minutes ?? sleepMinutesBetween(r.start ?? r.bed, r.wake))
-      .filter((m): m is number => m !== null);
+    const minutes = rows.map(sleepDurationMin).filter((m): m is number => m !== null);
     return minutes.length
       ? { value: Math.round((minutes.reduce((a, b) => a + b, 0) / minutes.length / 60) * 10) / 10, date: "近 7 天" }
       : null;
@@ -285,10 +284,4 @@ export async function currentMetricValue(
   if (!fromObs) return fromLab;
   if (!fromLab) return fromObs;
   return fromObs.date >= fromLab.date ? fromObs : fromLab;
-}
-
-export function sleepMinutesBetween(start: string | null, end: string | null): number | null {
-  if (!start || !end) return null;
-  const minutes = (new Date(end).getTime() - new Date(start).getTime()) / 60_000;
-  return minutes > 0 && minutes < 24 * 60 ? Math.round(minutes) : null;
 }

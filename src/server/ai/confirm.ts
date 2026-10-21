@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai/draft";
 import { recordAudit } from "@/lib/audit";
 import { addDrinkEvent, addFoodEvent } from "@/server/food";
+import { addExercise, addSymptom } from "@/server/lifestyle";
 import { addObservation } from "@/server/observations";
 import { getExtraction, settleExtraction } from "./extractions";
 
@@ -74,6 +75,30 @@ export async function confirmDraft(db: Db, user: SessionUser, draft: ConfirmDraf
         extractionId,
       });
       await recordAudit(db, { userId: user.id, action: "drink_event.create", entityId: id, metadata: { via: "ai" } });
+    } else if (event.kind === "exercise") {
+      const id = await addExercise(db, user, {
+        type: event.exerciseType,
+        startedAt: occurredAt,
+        durationMin: event.durationMin,
+        intensity: event.intensity,
+        afterMeal: event.afterMeal,
+        source: "ai_extract",
+        confidence: event.confidence,
+        extractionId,
+      });
+      await recordAudit(db, { userId: user.id, action: "exercise.create", entityId: id, metadata: { via: "ai" } });
+    } else if (event.kind === "symptom") {
+      const id = await addSymptom(db, user, {
+        type: event.symptomType,
+        occurredAt,
+        severity: event.severity,
+        durationMin: event.durationMin,
+        note: event.note,
+        source: "ai_extract",
+        confidence: event.confidence,
+        extractionId,
+      });
+      await recordAudit(db, { userId: user.id, action: "symptom.create", entityId: id, metadata: { via: "ai" } });
     } else {
       const values = validateMeasurementValues(event).data as Record<string, number>;
       const id = await addObservation(db, user, {

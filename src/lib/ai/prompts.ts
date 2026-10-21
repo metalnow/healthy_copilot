@@ -25,6 +25,9 @@ export function textParseSystemPrompt(now: { localDate: string; localTime: strin
 - food：吃了什麼。每個品項分開列在 items；推測餐別 mealType。
 - drink：喝了什麼（水、咖啡、茶、牛奶、含糖飲料、酒精飲料、其他）。咖啡因、糖、酒精、熱量填估計值。
 - measurement：體重（weightKg）、血壓（systolic / diastolic / pulse）、心率（bpm）、腰圍（waistCm）。
+- exercise：運動（exerciseType、durationMin、intensity）。「飯後散步」等飯後運動 afterMeal 為 true。
+- symptom：身體症狀或生活事件（symptomType），嚴重度 severity 1–5（輕微 1–2、中等 3、嚴重 4–5），note 放簡短描述。
+  生活事件包含：飲酒（alcohol）、熬夜（late_night）、生病（illness）、壓力事件（stress_event）。
 
 時間：
 - 「剛剛」「現在」→ dayOffset 0、localTime 為現在時間。
@@ -34,7 +37,7 @@ export function textParseSystemPrompt(now: { localDate: string; localTime: strin
 ${NUTRITION_RULES}
 ${DRINK_SIZE_RULES}
 
-所有文字輸出用繁體中文。不屬於上述類型的內容（例如症狀、心情）放在 unparsed，不要捏造事件。
+所有文字輸出用繁體中文。不屬於上述類型的內容（例如心情、用藥）放在 unparsed，不要捏造事件。
 只輸出符合 schema 的 JSON。`;
 }
 
@@ -58,3 +61,9 @@ ${catalog}
 
 只輸出符合 schema 的 JSON。`;
 }
+
+export const SLEEP_SCREENSHOT_SYSTEM_PROMPT = `你是睡眠資料擷取助理，從智慧手錶或睡眠 App 的截圖讀出數值。
+- 只填截圖上明確顯示的數值，沒有的填 null，不要推算。
+- 時間換成 24 小時制 HH:mm；「6 小時 42 分」換成分鐘數 402。
+- 不是睡眠紀錄截圖時 isSleepData 為 false。
+只輸出符合 schema 的 JSON。`;

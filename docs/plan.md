@@ -37,7 +37,7 @@
 | 2 Daily Tracking | 體重 / 血壓 / 心率 / 腰圍、文字輸入飲食與飲水、用藥定義與打勾、**Safety Rule：血壓閾值** | ✅ |
 | 3 AI Gateway | OpenRouter、Model Profile 設定、Zod 驗證與重試、信心值 / 確認流程、食物照片、語音（先做 spike 驗證 OpenRouter 音訊輸入） | ✅ |
 | 4 Health Records | 報告上傳（PDF 原生讀取 / 多張圖片）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | ✅ |
-| 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | |
+| 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | ✅ |
 | 6 Insight | 彙總服務、週回顧、趨勢圖、Today Focus、AI 洞察 | |
 | 7 Google Drive | Drive 授權、加密備份、手動 / 自動備份、還原（含 Picker）、資料匯出與刪除 | |
 
@@ -68,7 +68,7 @@
 - 每位使用者每小時最多 60 次 AI 請求；每次請求記錄 token / 秒數 / 費用與耗時，設定頁顯示本月用量。
 - 預設模型：fast `anthropic/claude-haiku-5.5`、vision `google/gemini-3.8-flash`、asr `openai/whisper-large-v3`、
   reasoning `anthropic/claude-sonnet-5.5`、medical_summary `anthropic/claude-opus-5.5`（皆有 ZDR 端點）。
-- 尚未支援：語音記錄用藥、症狀（Sprint 5）。
+- 尚未支援：語音記錄用藥。
 
 ## Sprint 4 實作備註
 
@@ -83,6 +83,17 @@
 - 原始檔案經 `/api/media/[id]` 提供（驗證擁有者、`Cache-Control: private, no-store`）。
 - 健康目標：檢驗 / 量測指標（體重、腰圍、血壓取日常量測與檢驗中較新者）與行為指標（近 7 天步數、睡眠、運動）。
 - D1 每個查詢最多 100 個參數：多列 insert 一律經 `chunkForInsert` 分批。
+
+## Sprint 5 實作備註
+
+- 睡眠：手動輸入上床 / 入睡 / 起床、醒來次數、主觀品質；可從手錶或 App 截圖匯入（vision 擷取後帶入表單確認），
+  來源記為 screenshot 並保存原始截圖 id 與信心值。睡眠歸到起床日期。
+- 步數 / 活動：每天每個來源一筆，重複輸入會覆蓋。
+- 運動：類型、時間、強度、RPE、是否飯後；症狀 / 生活事件：嚴重度 1–5、持續時間、可關聯 24 小時內的飲食。
+- AI 語音 / 文字也能解析運動與症狀；這兩類紀錄新增 source、confidence、extraction_id 欄位。
+- 危險訊號（固定規則）：胸痛、呼吸困難、暈厥、疑似嚴重過敏（過敏反應 ≥ 3 或蕁麻疹 ≥ 4）、明顯心悸、高燒。
+  最近 24 小時內的症狀會在「今日」頁頂端顯示提醒，依嚴重程度排序。
+- 時間軸：7 天一頁，可依類別篩選，所有紀錄（含用藥、檢驗）依時間排列，可直接刪除。
 
 ## 待驗證的技術風險
 
