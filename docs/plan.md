@@ -39,7 +39,7 @@
 | 4 Health Records | 報告上傳（PDF 原生讀取 / 多張圖片）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | ✅ |
 | 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | ✅ |
 | 6 Insight | 彙總服務、週回顧（+ 月回顧）、趨勢圖、Today Focus、AI 洞察 | ✅ |
-| 7 Google Drive | Drive 授權、加密備份、手動 / 自動備份、還原（含 Picker）、資料匯出與刪除 | |
+| 7 Google Drive | Drive 授權、加密備份、手動 / 自動備份、還原（Drive / 上傳檔案 + 復原金鑰）、資料匯出與刪除 | ✅ |
 
 ## Sprint 2 實作備註
 
@@ -109,8 +109,23 @@
   配色經 dataviz validator 驗證（單序列藍、血壓藍 / 橘）。檢驗項目歷史也有趨勢圖與參考值線。
 - 不提供單一健康分數。季回顧、Correlation Explorer、Experiment、Doctor Summary 為 P1。
 
+## Sprint 7 實作備註
+
+- Drive 授權：第一次啟用備份時才要求 `drive.file`（`openid` + `drive.file`、offline、consent），
+  沿用登入的 callback（以 cookie 區分用途），並確認是同一個 Google 帳號。token 以使用者 DEK 加密存放，快過期時自動換新。
+- 備份格式：各資料表的 D1 原始列 → JSON → ZIP（含 checksums.json、manifest.json）→ AES-256-GCM（使用者 DEK）。
+  上傳到 `Personal Health Copilot/backups/*.hcbackup`，根目錄 manifest.json 只放不含健康內容的中繼資料；保留最近 10 份。
+  可選擇包含原始檔（總量上限 50 MB）。登入 session、金鑰、Drive token、稽核紀錄不在備份中。
+- 自動備份：當地 03:00，每天 / 每週一 / 每月 1 日（預設每週），由 cron 送進 Queue 執行。
+- 還原：MVP 只支援「取代」。來源可為 Drive 上的備份或上傳的檔案（取代原計劃的 Google Picker，換部署也能還原）。
+  刪除與寫入在同一個 D1 batch（同一交易）；寫入以 `json_each(?)` 每個語句只綁定一個 JSON 參數。
+  使用者 id 與 R2 路徑會改成目前帳號；舊版備份缺少的欄位使用預設值。
+- 復原金鑰（`hcrk1-…`）：使用者自行保管的 DEK，伺服器金鑰遺失或在新帳號還原舊備份時使用。
+- 資料匯出：未加密 ZIP（可含原始檔）。刪除帳號：撤銷 Drive 授權、刪除 R2 原始檔與所有資料列；Drive 上的備份保留。
+
 ## 待驗證的技術風險
 
-- 含媒體的備份需串流壓縮與 Drive resumable upload，避免超過 Workers 128MB 記憶體。
+- 含媒體的備份目前整包在記憶體中處理（上限 50 MB）；若需要更大的備份需改為串流。
+- D1 單次呼叫的查詢數有上限（付費方案 1000）：資料量極大時還原可能需要分段。
 - 若使用 Cloudflare AI Gateway，必須關閉 prompt logging。
 - AI 營養估算的準確度需以實際使用回饋調整 prompt。

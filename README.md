@@ -83,6 +83,15 @@ Worker → Settings → Variables and Secrets，新增（類型選 Secret）：
 
 Google OAuth client 的 Authorized redirect URI 加入 `https://healthy-copilot.mtlnow.xyz/api/auth/google/callback`。
 
+### 4. Google Drive 備份（選用）
+
+在同一個 Google Cloud 專案：
+
+1. APIs & Services → Library → 啟用 **Google Drive API**
+2. OAuth consent screen → Data access（Scopes）→ 加入 `https://www.googleapis.com/auth/drive.file`
+
+不需要新增 redirect URI（沿用登入的 callback）。之後在「設定 → 資料與備份」按「連結 Google Drive」。
+
 ### 手動部署（不經 GitHub）
 
 ```bash

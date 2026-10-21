@@ -47,11 +47,11 @@ export async function sha256Hex(input: string | Uint8Array<ArrayBuffer>): Promis
   return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function importAesKey(raw: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+async function importAesKey(raw: Uint8Array<ArrayBuffer>, extractable = false): Promise<CryptoKey> {
   if (raw.byteLength !== 32) {
     throw new Error("AES-256 key must be 32 bytes");
   }
-  return crypto.subtle.importKey("raw", raw, ALGO, false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", raw, ALGO, extractable, ["encrypt", "decrypt"]);
 }
 
 /** 匯入 MASTER_ENCRYPTION_KEY（標準 base64 或 base64url 皆可） */
@@ -103,6 +103,7 @@ export async function createWrappedDataKey(masterKey: CryptoKey, userId: string)
   return encryptBytes(masterKey, randomBytes(32), `dek:${userId}`);
 }
 
-export async function unwrapDataKey(masterKey: CryptoKey, wrapped: string, userId: string) {
-  return importAesKey(await decryptBytes(masterKey, wrapped, `dek:${userId}`));
+/** extractable 只在匯出使用者自行保管的復原金鑰時使用 */
+export async function unwrapDataKey(masterKey: CryptoKey, wrapped: string, userId: string, extractable = false) {
+  return importAesKey(await decryptBytes(masterKey, wrapped, `dek:${userId}`), extractable);
 }

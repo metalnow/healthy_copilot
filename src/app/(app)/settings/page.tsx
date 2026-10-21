@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ComingSoon } from "@/components/coming-soon";
 import { requireUser } from "@/lib/auth/dal";
 
 export const metadata: Metadata = { title: "設定" };
@@ -42,12 +41,16 @@ export default async function SettingsPage() {
         </span>
         <span className="text-muted">›</span>
       </Link>
-      <ComingSoon
-        title="Google Drive 備份"
-        sprint="Sprint 7"
-        items={["加密備份、每週自動備份、還原"]}
-      />
-      <ComingSoon title="資料與隱私" sprint="Sprint 7" items={["匯出全部資料", "刪除帳號與所有資料"]} />
+      <Link
+        href="/settings/data"
+        className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 hover:border-accent"
+      >
+        <span>
+          <span className="block font-medium">資料與備份</span>
+          <span className="text-sm text-muted">Google Drive 加密備份、還原、匯出、刪除帳號</span>
+        </span>
+        <span className="text-muted">›</span>
+      </Link>
     </div>
   );
 }

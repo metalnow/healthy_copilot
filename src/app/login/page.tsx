@@ -13,7 +13,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   if (await getCurrentUser()) redirect("/");
 
-  const { error } = await searchParams;
+  const { error, deleted } = await searchParams;
   const message = typeof error === "string" ? ERROR_MESSAGES[error] : undefined;
 
   return (
@@ -24,6 +24,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           以健檢資料為基準，記錄每日行為與量測，定期回顧哪些改變真的對自己有幫助。
         </p>
       </div>
+
+      {deleted && <p role="status" className="rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent">帳號與所有資料已刪除。</p>}
 
       {message && (
         <p role="alert" className="rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
