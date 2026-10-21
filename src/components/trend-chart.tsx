@@ -74,7 +74,14 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
     return { dates, ticks, x, y, plotH };
   }, [series, reference, height]);
 
-  if (!model) return <p className="text-sm text-muted">還沒有資料。</p>;
+  if (!model) {
+    return (
+      <figure className="space-y-1">
+        <figcaption className="text-sm font-medium">{title}</figcaption>
+        <p className="text-sm text-muted">這段期間還沒有資料。</p>
+      </figure>
+    );
+  }
   const { dates, ticks, x, y } = model;
 
   const valuesAt = (date: string) =>
