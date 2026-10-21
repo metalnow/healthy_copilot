@@ -14,8 +14,11 @@ const NAV_ITEMS = [
 
 export function Nav() {
   const pathname = usePathname();
+  // 記錄表單與用藥管理都屬於「今日」
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+    href === "/"
+      ? pathname === "/" || pathname.startsWith("/log") || pathname.startsWith("/medications")
+      : pathname.startsWith(href);
 
   return (
     <nav

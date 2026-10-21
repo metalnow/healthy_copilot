@@ -34,12 +34,24 @@
 |---|---|---|
 | 0 Foundation | Next.js + OpenNext + Wrangler、D1 schema 與 migration、Zod schema、時區工具、加密工具、稽核紀錄、CI | ✅ |
 | 1 Auth & Shell | Google 登入、session、使用者初始化（DEK、預設設定）、主導覽與頁面骨架 | ✅（基本版） |
-| 2 Daily Tracking | 體重 / 血壓 / 心率 / 腰圍、文字輸入飲食與飲水、用藥定義與打勾、**Safety Rule：血壓閾值** | |
+| 2 Daily Tracking | 體重 / 血壓 / 心率 / 腰圍、文字輸入飲食與飲水、用藥定義與打勾、**Safety Rule：血壓閾值** | ✅ |
 | 3 AI Gateway | OpenRouter、Model Profile 設定、Zod 驗證與重試、信心值 / 確認流程、食物照片、語音（先做 spike 驗證 OpenRouter 音訊輸入） | |
 | 4 Health Records | 報告上傳（pdf.js 轉圖）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | |
 | 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | |
 | 6 Insight | 彙總服務、週回顧、趨勢圖、Today Focus、AI 洞察 | |
 | 7 Google Drive | Drive 授權、加密備份、手動 / 自動備份、還原（含 Picker）、資料匯出與刪除 | |
+
+## Sprint 2 實作備註
+
+- 量測：血壓可記錄情境（姿勢、手臂、休息時間、早餐前）；填了脈搏會另存一筆心率。
+- 危險訊號（`src/lib/safety/rules.ts`）：依「今天最新一筆」血壓 / 心率判斷，固定文案顯示在「今日」頁頂端。
+  - 血壓 ≥ 180/120：urgent，提示 119 / 急診的症狀條件
+  - 血壓 ≥ 160/100、收縮壓 < 90、心率 > 120 或 < 40：caution
+- 飲食：文字輸入多個品項、最近吃過的快速選取、複製同餐別上一次。營養估算留待 Sprint 3。
+- 飲水：水量計入每日飲水；酒精飲料依容量與酒精濃度換算酒精克數（密度 0.789）。
+- 用藥：每天固定時刻 + 可選星期；「今日」頁可服用 / 略過 / 復原；超過預定時間 2 小時服用記為「延遲」。
+  編輯時時刻不變的排程保留原 id，已打勾的紀錄不受影響。
+- 尚未支援：臨時（非排程）服藥、藥物庫存提醒。
 
 ## 待驗證的技術風險
 

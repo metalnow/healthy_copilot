@@ -29,3 +29,29 @@ export const BloodPressureContextSchema = z.object({
   beforeBreakfast: z.boolean().optional(),
   arm: z.enum(["left", "right"]).optional(),
 });
+
+/** 各量測類型的數值範圍；範圍刻意寬鬆，只用來擋輸入錯誤 */
+export const OBSERVATION_VALUE_SCHEMAS = {
+  weight: z.object({ weight: z.number().min(20).max(400) }),
+  blood_pressure: z
+    .object({
+      systolic: z.number().int().min(50).max(300),
+      diastolic: z.number().int().min(30).max(200),
+      pulse: z.number().int().min(20).max(250).optional(),
+    })
+    .refine((v) => v.systolic > v.diastolic, { message: "收縮壓必須大於舒張壓" }),
+  heart_rate: z.object({ bpm: z.number().int().min(20).max(250) }),
+  waist: z.object({ waist: z.number().min(40).max(200) }),
+} as const satisfies Record<ObservationType, z.ZodType>;
+
+export type ObservationType = (typeof OBSERVATION_TYPES)[number];
+export type ObservationValues<T extends ObservationType> = z.infer<
+  (typeof OBSERVATION_VALUE_SCHEMAS)[T]
+>;
+
+export const OBSERVATION_UNITS: Record<ObservationType, string> = {
+  weight: "kg",
+  blood_pressure: "mmHg",
+  heart_rate: "bpm",
+  waist: "cm",
+};

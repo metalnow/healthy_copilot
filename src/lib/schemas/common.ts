@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// 未自訂訊息的驗證錯誤一律使用繁體中文
+z.config(z.locales.zhTW());
+
 /** ISO 8601 時間，必須帶時區位移，例如 2026-10-20T08:00:00+08:00 */
 export const IsoDateTime = z.iso.datetime({ offset: true });
 
