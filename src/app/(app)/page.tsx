@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ComingSoon } from "@/components/coming-soon";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { formatMl, formatObservation, formatShortDate } from "@/lib/format";
@@ -22,6 +21,10 @@ import {
   listObservationsForDate,
   type ObservationRow,
 } from "@/server/observations";
+import { ReviewOutputSchema } from "@/lib/ai/schemas";
+import { deterministicInsights } from "@/lib/insights/aggregate";
+import { latestWeeklyReview } from "@/server/ai/reviews";
+import { addDays, summariesWithPrevious } from "@/server/insights";
 import { getTimeline } from "@/server/timeline";
 import { EntryList } from "./_components/entry-list";
 import { MedicationChecklist } from "./_components/medication-checklist";
@@ -106,7 +109,7 @@ export default async function TodayPage() {
   const today = toLocalDate(new Date(), user.timezone);
   const db = await getDb();
 
-  const [latest, todayObservations, food, drinks, checklist, lifestyle, symptoms, entries] = await Promise.all([
+  const [latest, todayObservations, food, drinks, checklist, lifestyle, symptoms, entries, week, review] = await Promise.all([
     latestObservations(db, user.id),
     listObservationsForDate(db, user.id, today),
     listFoodForDate(db, user.id, today),
@@ -115,7 +118,19 @@ export default async function TodayPage() {
     lifestyleForRange(db, user.id, today, today),
     recentSymptoms(db, user.id),
     getTimeline(db, user, today, today),
+    summariesWithPrevious(db, user, addDays(today, -6), today),
+    latestWeeklyReview(db, user.id),
   ]);
+
+  const recentSleep = [...week.currentInput.sleep]
+    .sort((a, b) => b.wakeAt.localeCompare(a.wakeAt))
+    .map(sleepDurationMin)
+    .filter((m): m is number => m !== null);
+  const insights = deterministicInsights(week.current, week.previous, recentSleep);
+  // 只採用最近兩週內的週回顧
+  const reviewOutput =
+    review && review.periodEnd >= addDays(today, -13) ? ReviewOutputSchema.safeParse(review.output) : null;
+  const focus = reviewOutput?.success ? reviewOutput.data.nextFocus.slice(0, 3) : [];
 
   const waterMl = drinks.reduce((sum, d) => sum + (d.waterMl ?? 0), 0);
   const otherDrinks = drinks.filter((d) => d.drinkType !== "water").length;
@@ -226,11 +241,43 @@ export default async function TodayPage() {
         {entries.length === 0 ? <p className="text-sm text-muted">今天還沒有紀錄。</p> : <EntryList items={entries} />}
       </section>
 
-      <ComingSoon
-        title="AI 洞察"
-        sprint="Sprint 6"
-        items={["每週最多 3 則趨勢觀察", "Today Focus：1–3 個行動"]}
-      />
+      <section aria-labelledby="focus-heading" className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 id="focus-heading" className="font-medium">
+            洞察與今日重點
+          </h2>
+          <Link href="/insights" className="text-sm text-accent">
+            更多
+          </Link>
+        </div>
+        {insights.length > 0 && (
+          <ul className="space-y-2">
+            {insights.map((insight) => (
+              <li key={insight.id} className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+                {insight.tone === "positive" ? "👍 " : insight.tone === "attention" ? "⚠ " : "• "}
+                {insight.text}
+              </li>
+            ))}
+          </ul>
+        )}
+        {focus.length > 0 ? (
+          <ol className="space-y-2">
+            {focus.map((f, i) => (
+              <li key={f.action} className="rounded-xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm">
+                <span className="font-medium">
+                  {i + 1}. {f.action}
+                </span>
+                <span className="block text-muted">{f.why}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-muted">
+            {insights.length === 0 ? "持續記錄幾天後，這裡會出現趨勢觀察。" : ""}
+            產生<Link href="/insights" className="text-accent">週回顧</Link>後，這裡會顯示 1–3 個本週重點行動。
+          </p>
+        )}
+      </section>
     </div>
   );
 }

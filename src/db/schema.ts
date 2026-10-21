@@ -543,7 +543,12 @@ export const aiReviews = sqliteTable(
     status: text("status", { enum: ["pending", "succeeded", "failed"] })
       .notNull()
       .default("pending"),
+    trigger: text("trigger", { enum: ["manual", "scheduled"] }).notNull().default("manual"),
+    usage: jsonText<AiUsage>("usage"),
+    error: text("error"),
+    durationMs: integer("duration_ms"),
     createdAt: createdAt(),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   },
   (t) => [uniqueIndex("ai_reviews_user_period_uq").on(t.userId, t.period, t.periodStart)],
 );

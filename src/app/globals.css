@@ -9,6 +9,10 @@
   --accent: #2f7d5b;
   --accent-foreground: #ffffff;
   --warning: #b45309;
+  /* 圖表資料色（已用 dataviz validator 驗證對比與色盲區辨） */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --grid: #ecece8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +25,9 @@
     --accent: #5fbf8f;
     --accent-foreground: #0d1f16;
     --warning: #f59e0b;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --grid: #2a2a27;
   }
 }
 
@@ -33,6 +40,9 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-warning: var(--warning);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-grid: var(--grid);
   --font-sans:
     system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }

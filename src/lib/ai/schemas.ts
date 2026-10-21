@@ -132,3 +132,23 @@ export const SleepScreenshotSchema = z.strictObject({
   notes: z.string().nullable(),
 });
 export type SleepScreenshot = z.infer<typeof SleepScreenshotSchema>;
+
+export const ReviewOutputSchema = z.strictObject({
+  headline: z.string().describe("一句話總結這段期間"),
+  wins: z.array(z.string()).describe("做得好的地方，最多 4 點"),
+  concerns: z.array(z.string()).describe("值得留意的地方，最多 4 點"),
+  patterns: z
+    .array(
+      z.strictObject({
+        kind: z.enum(["observation", "correlation", "hypothesis"]),
+        text: z.string(),
+      }),
+    )
+    .describe("可能的模式，最多 4 點；必須標明是觀察、相關或假設"),
+  nextFocus: z
+    .array(z.strictObject({ action: z.string().describe("具體可執行的行動"), why: z.string() }))
+    .describe("下一期的重點行動 1–3 個"),
+  labFollowUp: z.array(z.string()).describe("建議與醫師討論是否複檢的項目（僅提醒），沒有則空陣列"),
+  dataGaps: z.array(z.string()).describe("資料不足、無法判斷的部分"),
+});
+export type ReviewOutput = z.infer<typeof ReviewOutputSchema>;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConfirmButton } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
+import { TrendChart } from "@/components/trend-chart";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { getLabDefinition } from "@/lib/labs/catalog";
@@ -20,11 +21,36 @@ export default async function LabHistoryPage({ params }: PageProps<"/health/labs
   if (history.length === 0) notFound();
 
   const latest = history[history.length - 1];
+  // 同一天多筆時取最後一筆；只畫標準單位相同的數值
+  const numeric = [
+    ...new Map(
+      history
+        .filter((r) => r.value !== null && r.unit === latest.unit)
+        .map((r) => [r.measuredAt, { date: r.measuredAt, value: r.value! }]),
+    ).values(),
+  ];
   const name = latest.code === "OTHER" ? latest.displayName : (getLabDefinition(latest.code)?.name ?? latest.displayName);
 
   return (
     <div className="space-y-6">
       <PageHeader title={name} backHref="/health" backLabel="健康" />
+      {numeric.length >= 2 && (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <TrendChart
+            title={name}
+            unit={latest.unit ?? undefined}
+            digits={2}
+            series={[{ name, color: "series-1", points: numeric }]}
+            reference={
+              latest.referenceMax !== null
+                ? { value: latest.referenceMax, label: `上限 ${latest.referenceMax}` }
+                : latest.referenceMin !== null
+                  ? { value: latest.referenceMin, label: `下限 ${latest.referenceMin}` }
+                  : undefined
+            }
+          />
+        </div>
+      )}
       <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
         {[...history].reverse().map((row) => (
           <li key={row.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">

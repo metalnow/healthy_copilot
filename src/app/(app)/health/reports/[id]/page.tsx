@@ -15,7 +15,7 @@ import { documentMedia, getHealthDocument } from "@/server/health";
 import { deleteReport, retryReport } from "../../actions";
 import { DOCUMENT_ERROR_MESSAGES, DOCUMENT_STATUS_LABELS } from "../status";
 import { LabReviewEditor } from "./lab-review-editor";
-import { StatusPoller } from "./status-poller";
+import { StatusPoller } from "@/components/status-poller";
 
 export const metadata: Metadata = { title: "健檢報告" };
 

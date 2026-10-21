@@ -1,9 +1,9 @@
 import { createDb } from "@/db/client";
 import { users } from "@/db/schema";
+import { requestReview } from "@/server/ai/reviews";
 import { localWeekdayAndHour } from "@/lib/time";
-import type { JobMessage } from "./types";
 
-/** 週回顧在使用者當地週日 21:00 產生（Sprint 6 實作） */
+/** 週回顧在使用者當地週日 21:00 產生 */
 const WEEKLY_REVIEW = { weekday: 0, hour: 21 } as const;
 
 /**
@@ -15,14 +15,14 @@ export async function handleScheduled(controller: ScheduledController, env: Clou
   const db = createDb(env.DB);
   const rows = await db.select({ id: users.id, timezone: users.timezone }).from(users);
 
-  const due = rows.filter((user) => {
+  for (const user of rows) {
     const local = localWeekdayAndHour(now, user.timezone);
-    return local.weekday === WEEKLY_REVIEW.weekday && local.hour === WEEKLY_REVIEW.hour;
-  });
-
-  if (due.length > 0) {
-    await env.AI_QUEUE.sendBatch(
-      due.map((user) => ({ body: { kind: "weekly_review", userId: user.id } satisfies JobMessage })),
-    );
+    if (env.OPENROUTER_API_KEY && local.weekday === WEEKLY_REVIEW.weekday && local.hour === WEEKLY_REVIEW.hour) {
+      try {
+        await requestReview(db, env, user, "weekly", "scheduled");
+      } catch (error) {
+        console.error("schedule weekly review failed", error instanceof Error ? error.name : "unknown");
+      }
+    }
   }
 }
