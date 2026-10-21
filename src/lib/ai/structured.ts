@@ -55,6 +55,7 @@ export async function generateStructured<T>(
     schema: z.ZodType<T>;
     schemaName: string;
     maxRetries?: number;
+    plugins?: unknown[];
   },
 ): Promise<StructuredResult<T>> {
   const messages: ChatMessage[] = [
@@ -73,6 +74,7 @@ export async function generateStructured<T>(
       jsonSchema,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
+      plugins: request.plugins,
     });
     usage = sumUsage(usage, completion.usage);
 

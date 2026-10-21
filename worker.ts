@@ -6,7 +6,8 @@
 // @ts-ignore `.open-next/worker.js` 於 `opennextjs-cloudflare build` 時產生
 import { default as handler } from "./.open-next/worker.js";
 import { handleQueue } from "./src/jobs/queue";
-import { handleScheduled, type JobMessage } from "./src/jobs/scheduled";
+import { handleScheduled } from "./src/jobs/scheduled";
+import type { JobMessage } from "./src/jobs/types";
 
 export default {
   fetch: handler.fetch,
@@ -15,8 +16,8 @@ export default {
     ctx.waitUntil(handleScheduled(controller, env));
   },
 
-  async queue(batch) {
-    await handleQueue(batch);
+  async queue(batch, env) {
+    await handleQueue(batch, env);
   },
 } satisfies ExportedHandler<CloudflareEnv, JobMessage>;
 

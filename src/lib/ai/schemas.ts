@@ -81,3 +81,27 @@ export function toResponseSchema(schema: z.ZodType) {
   delete json.$schema;
   return json;
 }
+
+export const LabExtractionItemSchema = z.strictObject({
+  code: z.string().describe("代碼表中的代碼；不在代碼表中填 OTHER"),
+  displayName: z.string().describe("報告上的項目名稱（原文）"),
+  value: z.number().nullable().describe("數值結果；質性結果填 null"),
+  textValue: z.string().nullable().describe("文字結果，例如 陰性、陽性、1:80、超音波描述；數值結果填 null"),
+  unit: z.string().nullable().describe("報告上的單位（原文）"),
+  referenceMin: z.number().nullable(),
+  referenceMax: z.number().nullable(),
+  referenceText: z.string().nullable().describe("參考值原文，例如 <150、陰性"),
+  abnormalFlag: z.enum(["low", "high", "critical", "normal", "unknown"]).nullable().describe("報告上的異常標示（H / L / * 等）"),
+  page: z.number().nullable().describe("所在頁碼（從 1 開始）"),
+  confidence: z.number().describe("辨識信心 0–1"),
+});
+export type LabExtractionItem = z.infer<typeof LabExtractionItemSchema>;
+
+export const LabExtractionSchema = z.strictObject({
+  isHealthReport: z.boolean().describe("是否為健檢或檢驗報告"),
+  reportDate: z.string().nullable().describe("檢查日期 YYYY-MM-DD"),
+  institution: z.string().nullable().describe("醫療院所名稱"),
+  items: z.array(LabExtractionItemSchema),
+  notes: z.string().nullable().describe("給使用者的補充，例如模糊無法辨識的頁面"),
+});
+export type LabExtraction = z.infer<typeof LabExtractionSchema>;

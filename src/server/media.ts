@@ -1,4 +1,3 @@
-import "server-only";
 import type { Db } from "@/db/client";
 import { mediaObjects } from "@/db/schema";
 import { sha256Hex } from "@/lib/crypto";
@@ -8,6 +7,7 @@ const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "application/pdf": "pdf",
   "audio/webm": "webm",
   "audio/mp4": "m4a",
   "audio/ogg": "ogg",

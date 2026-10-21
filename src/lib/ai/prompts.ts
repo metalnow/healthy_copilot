@@ -40,3 +40,21 @@ ${DRINK_SIZE_RULES}
 
 export const STRUCTURED_RETRY_PROMPT = (issues: string) =>
   `上一次的輸出不符合要求的 JSON 格式：\n${issues}\n請修正後只輸出符合 schema 的 JSON，不要加任何說明。`;
+
+export function labReportSystemPrompt(catalog: string) {
+  return `你是健檢報告資料擷取助理，把報告中的檢驗與量測結果逐項轉成結構化 JSON。
+規則：
+- 只擷取報告上明確寫出的結果，不推測、不計算、不補值。
+- 每個項目對應到下列代碼；沒有對應的填 OTHER，displayName 保留報告原文。
+- 數值放 value、單位照原文放 unit；陰性 / 陽性、效價、影像描述等放 textValue。
+- 參考範圍拆成 referenceMin / referenceMax（例如「70-100」），無法拆解時放 referenceText。
+- 報告有 H、L、*、↑、↓ 等標示時填 abnormalFlag，沒有標示填 null。
+- 超音波、心血管風險等描述性結果用一筆 ULTRASOUND / CV_RISK，textValue 放重點摘要（不超過 200 字）。
+- 不是健檢或檢驗報告時 isHealthReport 為 false、items 為空陣列。
+- 不要輸出任何個人身分資料（姓名、身分證號、病歷號、生日）。
+
+代碼表：
+${catalog}
+
+只輸出符合 schema 的 JSON。`;
+}

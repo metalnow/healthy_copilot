@@ -1,6 +1,7 @@
 import { createDb } from "@/db/client";
 import { users } from "@/db/schema";
 import { localWeekdayAndHour } from "@/lib/time";
+import type { JobMessage } from "./types";
 
 /** 週回顧在使用者當地週日 21:00 產生（Sprint 6 實作） */
 const WEEKLY_REVIEW = { weekday: 0, hour: 21 } as const;
@@ -25,7 +26,3 @@ export async function handleScheduled(controller: ScheduledController, env: Clou
     );
   }
 }
-
-export type JobMessage =
-  | { kind: "weekly_review"; userId: string }
-  | { kind: "ai_extraction"; userId: string; extractionId: string };

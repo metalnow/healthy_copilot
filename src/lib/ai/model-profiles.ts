@@ -52,6 +52,9 @@ export function validateModelChoice(
   if (capability === "image" && !model.inputModalities.includes("image")) {
     return "這個模型不支援圖片輸入";
   }
+  if (capability === "image" && !model.inputModalities.includes("file")) {
+    return "這個模型不支援 PDF 檔案輸入（健檢報告需要）";
+  }
   if (capability !== "transcription" && !model.outputModalities.includes("text")) {
     return "這個模型不會輸出文字";
   }

@@ -14,6 +14,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 部署在 Cloudflare Workers（OpenNext），資料庫為 D1（SQLite）。不要使用 Node 專屬 API 或需要原生模組的套件。
 - 需要登入的資料存取一律經過 `src/lib/auth/dal.ts` 的 `requireUser()`，查詢務必以 `userId` 過濾。
 - 修改 `src/db/schema.ts` 後執行 `npm run db:generate` 並 commit 產生的 migration。
+- `src/server/**` 也會被 Worker 的 cron / queue handler 使用：不可 import `next/*` 或 `server-only`。
+- D1 每個查詢最多 100 個參數：多列 insert 用 `src/db/batch.ts` 的 `chunkForInsert`。
 - 列舉值放 `src/lib/enums.ts`，讓 DB 與 Zod 共用。
 - 事件時間存 UTC ISO + `local_date` + `timezone`（用 `src/lib/time.ts`）。
 - 稽核紀錄與 log 不可包含健康內容。AI 估算值必須標示來源與信心值，並經使用者確認。

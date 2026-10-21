@@ -1,4 +1,3 @@
-import "server-only";
 import type { Db } from "@/db/client";
 import type { SessionUser } from "@/lib/auth/session";
 import {

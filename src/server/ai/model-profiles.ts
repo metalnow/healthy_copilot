@@ -1,4 +1,3 @@
-import "server-only";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { modelProfiles } from "@/db/schema";

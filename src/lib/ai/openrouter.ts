@@ -52,7 +52,11 @@ export class AiError extends Error {
 
 export type ContentPart =
   | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "file"; file: { filename: string; file_data: string } };
+
+/** PDF 一律交給模型原生讀取，不轉給第三方 OCR 服務 */
+export const NATIVE_PDF_PLUGIN = [{ id: "file-parser", pdf: { engine: "native" } }];
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -128,6 +132,7 @@ export async function chatCompletion(
     jsonSchema?: { name: string; schema: Record<string, unknown> };
     temperature?: number | null;
     maxTokens?: number | null;
+    plugins?: unknown[];
   },
 ): Promise<{ content: string; model: string; usage: ChatUsage }> {
   const response = await post<ChatCompletionResponse>(config, "/chat/completions", {
@@ -135,6 +140,7 @@ export async function chatCompletion(
     messages: request.messages,
     ...(request.temperature != null && { temperature: request.temperature }),
     ...(request.maxTokens != null && { max_tokens: request.maxTokens }),
+    ...(request.plugins && { plugins: request.plugins }),
     ...(request.jsonSchema && {
       response_format: {
         type: "json_schema",

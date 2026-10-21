@@ -1,4 +1,3 @@
-import "server-only";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { medicationEvents, medications, medicationSchedules } from "@/db/schema";

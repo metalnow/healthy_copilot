@@ -1,4 +1,3 @@
-import "server-only";
 import { and, count, eq, gte, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { aiExtractions, type AiUsage } from "@/db/schema";

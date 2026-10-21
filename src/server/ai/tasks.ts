@@ -1,4 +1,3 @@
-import "server-only";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { userSettings, type AiUsage, type AiUsageStep } from "@/db/schema";
@@ -17,6 +16,7 @@ import type { AI_TASKS } from "@/lib/enums";
 import { WEEKDAY_LABELS } from "@/lib/labels";
 import { toDateTimeLocalValue, toLocalDate, weekdayOfLocalDate } from "@/lib/time";
 import { putMedia } from "@/server/media";
+import { openRouterConfig } from "./config";
 import {
   completeExtraction,
   createExtraction,
@@ -35,10 +35,6 @@ export type AiTaskResult = {
 };
 
 type Env = Pick<CloudflareEnv, "MEDIA" | "OPENROUTER_API_KEY" | "OPENROUTER_BASE_URL">;
-
-function openRouterConfig(env: Env): OpenRouterConfig {
-  return { apiKey: env.OPENROUTER_API_KEY ?? "", baseUrl: env.OPENROUTER_BASE_URL || undefined };
-}
 
 async function shouldLogRawContent(db: Db, userId: string) {
   const [row] = await db

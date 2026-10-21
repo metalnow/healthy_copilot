@@ -1,5 +1,5 @@
-import "server-only";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { chunkForInsert } from "@/db/batch";
 import type { Db } from "@/db/client";
 import { drinkEvents, foodEvents, foodItems } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
@@ -44,7 +44,8 @@ export async function addFoodEvent(
       // 手動輸入或經使用者確認的 AI 結果
       verifiedByUser: true,
     }),
-    db.insert(foodItems).values(
+    ...chunkForInsert(
+      foodItems,
       input.items.map((item, position) => ({
         foodEventId: eventId,
         position,
@@ -53,7 +54,7 @@ export async function addFoodEvent(
         nutrition: item.nutrition,
         confidence: item.confidence,
       })),
-    ),
+    ).map((rows) => db.insert(foodItems).values(rows)),
   ]);
   return eventId;
 }

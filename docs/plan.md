@@ -36,7 +36,7 @@
 | 1 Auth & Shell | Google 登入、session、使用者初始化（DEK、預設設定）、主導覽與頁面骨架 | ✅（基本版） |
 | 2 Daily Tracking | 體重 / 血壓 / 心率 / 腰圍、文字輸入飲食與飲水、用藥定義與打勾、**Safety Rule：血壓閾值** | ✅ |
 | 3 AI Gateway | OpenRouter、Model Profile 設定、Zod 驗證與重試、信心值 / 確認流程、食物照片、語音（先做 spike 驗證 OpenRouter 音訊輸入） | ✅ |
-| 4 Health Records | 報告上傳（pdf.js 轉圖）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | |
+| 4 Health Records | 報告上傳（PDF 原生讀取 / 多張圖片）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | ✅ |
 | 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | |
 | 6 Insight | 彙總服務、週回顧、趨勢圖、Today Focus、AI 洞察 | |
 | 7 Google Drive | Drive 授權、加密備份、手動 / 自動備份、還原（含 Picker）、資料匯出與刪除 | |
@@ -69,6 +69,20 @@
 - 預設模型：fast `anthropic/claude-haiku-5.5`、vision `google/gemini-3.8-flash`、asr `openai/whisper-large-v3`、
   reasoning `anthropic/claude-sonnet-5.5`、medical_summary `anthropic/claude-opus-5.5`（皆有 ZDR 端點）。
 - 尚未支援：語音記錄用藥、症狀（Sprint 5）。
+
+## Sprint 4 實作備註
+
+- 報告上傳：一份 PDF（≤ 15 MB）或最多 12 張圖片。PDF 以 OpenRouter `file` 內容直接交給模型，
+  指定 `file-parser` 的 `native` 引擎，不經第三方 OCR；因此「影像辨識」模型必須支援圖片與檔案輸入。
+  （取代原計劃的瀏覽器端 pdf.js 轉圖。）
+- 擷取在 Queue 背景執行：上傳後文件狀態為 extracting，頁面每 4 秒重新整理；
+  逾時 / 供應商錯誤 / 限流最多重試 3 次，其餘錯誤標記為 failed，可手動重新辨識。
+- 檢驗代碼表 `src/lib/labs/catalog.ts`：統一代碼、別名、標準單位與換算（mmol/L、µmol/L、IFCC HbA1c 等）。
+  確認時數值與參考範圍一起換算；報告未標示高低時依參考範圍判斷。
+- 確認畫面逐項可改代碼、數值、單位、參考值、異常標示，可新增 / 刪除項目；低信心項目特別標示。
+- 原始檔案經 `/api/media/[id]` 提供（驗證擁有者、`Cache-Control: private, no-store`）。
+- 健康目標：檢驗 / 量測指標（體重、腰圍、血壓取日常量測與檢驗中較新者）與行為指標（近 7 天步數、睡眠、運動）。
+- D1 每個查詢最多 100 個參數：多列 insert 一律經 `chunkForInsert` 分批。
 
 ## 待驗證的技術風險
 

@@ -1,4 +1,3 @@
-import "server-only";
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { observations } from "@/db/schema";

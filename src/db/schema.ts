@@ -15,6 +15,7 @@ import {
   EXERCISE_TYPES,
   GOAL_DIRECTIONS,
   GOAL_STATUSES,
+  HEALTH_DOCUMENT_STATUSES,
   INPUT_TYPES,
   INTENSITIES,
   LAB_SOURCES,
@@ -240,9 +241,12 @@ export const healthDocuments = sqliteTable(
     institution: text("institution"),
     reportDate: text("report_date"),
     pageCount: integer("page_count"),
-    status: text("status", { enum: ["uploaded", "extracting", "review", "confirmed"] })
-      .notNull()
-      .default("uploaded"),
+    /** 多張圖片組成的報告：依頁序排列的 media id（第一頁同 media_id） */
+    pageMediaIds: jsonText<string[]>("page_media_ids"),
+    status: text("status", { enum: HEALTH_DOCUMENT_STATUSES }).notNull().default("uploaded"),
+    extractionId: text("extraction_id").references(() => aiExtractions.id),
+    /** 擷取失敗的錯誤代碼（不含健康內容） */
+    error: text("error"),
     createdAt: createdAt(),
   },
   (t) => [index("health_documents_user_idx").on(t.userId, t.reportDate)],
