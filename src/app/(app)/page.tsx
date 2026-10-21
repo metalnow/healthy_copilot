@@ -32,6 +32,12 @@ const QUICK_ADD = [
   { href: "/log/drink", label: "飲水" },
 ] as const;
 
+const AI_MODES = [
+  { mode: "photo", label: "📷 拍餐點" },
+  { mode: "voice", label: "🎤 說一句" },
+  { mode: "text", label: "⌨️ 打一句" },
+] as const;
+
 /** 依今天最新一筆血壓 / 心率套用固定規則 */
 function todaySafetyAlerts(todayObservations: ObservationRow[]): SafetyAlert[] {
   const latestOf = (type: ObservationType) => todayObservations.find((o) => o.type === type);
@@ -106,6 +112,18 @@ export default async function TodayPage() {
       </div>
 
       <SafetyBanner alerts={todaySafetyAlerts(todayObservations)} />
+
+      <nav aria-label="AI 快速記錄" className="grid grid-cols-3 gap-2">
+        {AI_MODES.map((item) => (
+          <Link
+            key={item.mode}
+            href={`/log/ai?mode=${item.mode}`}
+            className="rounded-xl bg-accent px-2 py-3 text-center text-sm font-medium text-accent-foreground"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
 
       <nav aria-label="快速記錄" className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {QUICK_ADD.map((item) => (

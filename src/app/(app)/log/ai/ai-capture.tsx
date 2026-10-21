@@ -1,0 +1,197 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { FormError, inputClass } from "@/components/form";
+import type { AiTaskResult } from "@/server/ai/tasks";
+import { DraftEditor } from "./draft-editor";
+import { resizeImage } from "./image";
+import { MAX_RECORDING_SECONDS, useRecorder } from "./use-recorder";
+
+type Mode = "photo" | "voice" | "text";
+
+const MODES: { value: Mode; label: string }[] = [
+  { value: "photo", label: "📷 拍照" },
+  { value: "voice", label: "🎤 語音" },
+  { value: "text", label: "⌨️ 文字" },
+];
+
+async function postAi(path: string, body: FormData | object): Promise<AiTaskResult> {
+  const response = await fetch(path, {
+    method: "POST",
+    ...(body instanceof FormData
+      ? { body }
+      : { body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
+  });
+  const json = (await response.json().catch(() => null)) as { error?: string } | null;
+  if (!response.ok) throw new Error(json?.error ?? "AI 分析失敗，請稍後再試");
+  return json as AiTaskResult;
+}
+
+export function AiCapture({ configured, initialMode }: { configured: boolean; initialMode: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [result, setResult] = useState<AiTaskResult>();
+  const [busy, setBusy] = useState<string>();
+  const [error, setError] = useState<string>();
+  const [preview, setPreview] = useState<string>();
+  const [text, setText] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const run = useCallback(async (label: string, task: () => Promise<AiTaskResult>) => {
+    setError(undefined);
+    setBusy(label);
+    try {
+      setResult(await task());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI 分析失敗，請稍後再試");
+    } finally {
+      setBusy(undefined);
+    }
+  }, []);
+
+  const onAudio = useCallback(
+    (blob: Blob) =>
+      run("語音辨識中…", () => {
+        const form = new FormData();
+        form.set("audio", new File([blob], "voice", { type: blob.type }));
+        return postAi("/api/ai/voice", form);
+      }),
+    [run],
+  );
+  const recorder = useRecorder(onAudio);
+
+  const onPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    let resized: Blob;
+    try {
+      resized = await resizeImage(file);
+    } catch {
+      setError("無法讀取這張照片，請改用 JPEG 或 PNG");
+      return;
+    }
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(URL.createObjectURL(resized));
+    await run("AI 辨識照片中…", () => {
+      const form = new FormData();
+      form.set("photo", new File([resized], "food.jpg", { type: "image/jpeg" }));
+      return postAi("/api/ai/food-photo", form);
+    });
+  };
+
+  const reset = () => {
+    setResult(undefined);
+    setError(undefined);
+    setText("");
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  if (!configured) {
+    return (
+      <p className="rounded-xl border border-warning/40 p-4 text-sm text-warning">
+        尚未設定 OpenRouter API Key（OPENROUTER_API_KEY），AI 功能暫時無法使用。
+      </p>
+    );
+  }
+
+  if (result) {
+    return (
+      <div className="space-y-4">
+        {preview && result.task === "food_vision" && (
+          // eslint-disable-next-line @next/next/no-img-element -- 本機 blob 預覽，不經過 next/image
+          <img src={preview} alt="上傳的照片" className="max-h-56 w-full rounded-xl object-cover" />
+        )}
+        <DraftEditor result={result} onReset={reset} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div role="tablist" aria-label="輸入方式" className="grid grid-cols-3 gap-2">
+        {MODES.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            role="tab"
+            aria-selected={mode === m.value}
+            onClick={() => setMode(m.value)}
+            disabled={Boolean(busy) || recorder.recording}
+            className="rounded-lg border border-border px-2 py-2 text-sm aria-selected:border-accent aria-selected:bg-accent aria-selected:text-accent-foreground"
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      <FormError message={error ?? recorder.error} />
+
+      {busy ? (
+        <div role="status" className="flex flex-col items-center gap-3 py-10 text-muted">
+          <span className="size-8 animate-spin rounded-full border-2 border-border border-t-accent" />
+          {busy}
+        </div>
+      ) : mode === "photo" ? (
+        <div className="space-y-3">
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface px-4 py-10 text-center">
+            <span className="text-3xl">📷</span>
+            <span className="font-medium">拍攝或選擇餐點照片</span>
+            <span className="text-xs text-muted">AI 會辨識食物、份量並估算營養</span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => onPhoto(e.target.files?.[0])}
+              className="sr-only"
+            />
+          </label>
+        </div>
+      ) : mode === "voice" ? (
+        <div className="flex flex-col items-center gap-4 py-6">
+          <button
+            type="button"
+            onClick={recorder.recording ? recorder.stop : recorder.start}
+            aria-pressed={recorder.recording}
+            className={`flex size-28 items-center justify-center rounded-full text-4xl text-accent-foreground ${recorder.recording ? "animate-pulse bg-red-600" : "bg-accent"}`}
+            aria-label={recorder.recording ? "停止錄音並送出" : "開始錄音"}
+          >
+            {recorder.recording ? "■" : "🎤"}
+          </button>
+          <p className="text-sm text-muted">
+            {recorder.recording
+              ? `錄音中 ${recorder.seconds} / ${MAX_RECORDING_SECONDS} 秒，再按一次送出`
+              : "按下開始錄音，例如：「剛剛三點喝了一杯大杯無糖拿鐵，吃兩塊鳳梨酥」"}
+          </p>
+        </div>
+      ) : (
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (text.trim()) run("AI 解析中…", () => postAi("/api/ai/text", { text }));
+          }}
+        >
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={4}
+            maxLength={1000}
+            placeholder="例如：早餐吃了兩顆水煮蛋和一杯美式咖啡，剛量血壓 128/82"
+            aria-label="描述吃了什麼、喝了什麼或量測結果"
+            className={inputClass}
+          />
+          <button
+            type="submit"
+            disabled={!text.trim()}
+            className="w-full rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground disabled:opacity-60"
+          >
+            AI 解析
+          </button>
+        </form>
+      )}
+
+      <p className="text-xs text-muted">
+        AI 請求只會送到不保留資料的服務端點，且不包含你的姓名或帳號資訊。結果需經你確認才會儲存。
+      </p>
+    </div>
+  );
+}

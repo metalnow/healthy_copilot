@@ -29,6 +29,16 @@ import {
 } from "@/lib/enums";
 import type { NutritionEstimate } from "@/lib/schemas/common";
 
+export type AiUsageStep = {
+  profile: string;
+  modelId: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  audioSeconds?: number;
+  cost?: number;
+};
+export type AiUsage = { steps: AiUsageStep[]; totalCost: number };
+
 // 慣例：
 // - 主鍵為 UUID 字串
 // - 時間點以 ISO 8601 UTC 字串存放（*_at）
@@ -191,10 +201,16 @@ export const aiExtractions = sqliteTable(
     parsedOutput: jsonText<unknown>("parsed_output"),
     confidence: real("confidence"),
     error: text("error"),
+    /** 每個模型呼叫的 token / 秒數與費用（OpenRouter credits） */
+    usage: jsonText<AiUsage>("usage"),
+    durationMs: integer("duration_ms"),
     createdAt: createdAt(),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   },
-  (t) => [index("ai_extractions_user_idx").on(t.userId, t.status)],
+  (t) => [
+    index("ai_extractions_user_idx").on(t.userId, t.status),
+    index("ai_extractions_user_created_idx").on(t.userId, t.createdAt),
+  ],
 );
 
 // ─── Health Baseline ───────────────────────────────────────

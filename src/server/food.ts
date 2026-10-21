@@ -3,10 +3,15 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drinkEvents, foodEvents, foodItems } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
-import type { DrinkType, MealType } from "@/lib/enums";
+import type { DrinkType, INPUT_TYPES, MealType } from "@/lib/enums";
+import type { NutritionEstimate } from "@/lib/schemas/common";
 import { eventTimeFields } from "@/lib/time";
 
+type FoodInputType = (typeof INPUT_TYPES)[number];
+
 export type FoodItemDraft = { name: string; portion?: string };
+
+type FoodItemInput = FoodItemDraft & { nutrition?: NutritionEstimate; confidence?: number };
 
 export async function addFoodEvent(
   db: Db,
@@ -14,9 +19,13 @@ export async function addFoodEvent(
   input: {
     mealType: MealType;
     occurredAt: Date;
-    inputType: "text" | "quick_item";
-    items: FoodItemDraft[];
+    inputType: FoodInputType;
+    items: FoodItemInput[];
     note?: string;
+    totalNutrition?: NutritionEstimate;
+    aiConfidence?: number;
+    mediaId?: string;
+    extractionId?: string;
   },
 ) {
   const eventId = crypto.randomUUID();
@@ -28,7 +37,11 @@ export async function addFoodEvent(
       ...eventTimeFields(input.occurredAt, user.timezone),
       inputType: input.inputType,
       note: input.note,
-      // 使用者手動輸入的品項即為確認後資料；營養估算於 Sprint 3 由 AI 補上
+      totalNutrition: input.totalNutrition,
+      aiConfidence: input.aiConfidence,
+      mediaId: input.mediaId,
+      extractionId: input.extractionId,
+      // 手動輸入或經使用者確認的 AI 結果
       verifiedByUser: true,
     }),
     db.insert(foodItems).values(
@@ -37,6 +50,8 @@ export async function addFoodEvent(
         position,
         name: item.name,
         portion: item.portion,
+        nutrition: item.nutrition,
+        confidence: item.confidence,
       })),
     ),
   ]);
@@ -59,6 +74,14 @@ export async function addDrinkEvent(
     occurredAt: Date;
     volumeMl: number;
     abvPercent?: number;
+    inputType?: FoodInputType;
+    /** AI 估算值；有填 alcoholG 時優先於 abvPercent 換算 */
+    caffeineMg?: number;
+    sugarG?: number;
+    alcoholG?: number;
+    nutrition?: NutritionEstimate;
+    confidence?: number;
+    extractionId?: string;
   },
 ) {
   const [row] = await db
@@ -68,13 +91,19 @@ export async function addDrinkEvent(
       drinkType: input.drinkType,
       name: input.name,
       ...eventTimeFields(input.occurredAt, user.timezone),
-      inputType: "manual",
+      inputType: input.inputType ?? "manual",
       volumeMl: input.volumeMl,
       waterMl: input.drinkType === "water" ? input.volumeMl : null,
+      caffeineMg: input.caffeineMg,
+      sugarG: input.sugarG,
       alcoholG:
-        input.drinkType === "alcohol" && input.abvPercent !== undefined
+        input.alcoholG ??
+        (input.drinkType === "alcohol" && input.abvPercent !== undefined
           ? alcoholGrams(input.volumeMl, input.abvPercent)
-          : null,
+          : null),
+      nutrition: input.nutrition,
+      confidence: input.confidence,
+      extractionId: input.extractionId,
       verifiedByUser: true,
     })
     .returning({ id: drinkEvents.id });

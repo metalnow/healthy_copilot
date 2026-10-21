@@ -35,7 +35,7 @@
 | 0 Foundation | Next.js + OpenNext + Wrangler、D1 schema 與 migration、Zod schema、時區工具、加密工具、稽核紀錄、CI | ✅ |
 | 1 Auth & Shell | Google 登入、session、使用者初始化（DEK、預設設定）、主導覽與頁面骨架 | ✅（基本版） |
 | 2 Daily Tracking | 體重 / 血壓 / 心率 / 腰圍、文字輸入飲食與飲水、用藥定義與打勾、**Safety Rule：血壓閾值** | ✅ |
-| 3 AI Gateway | OpenRouter、Model Profile 設定、Zod 驗證與重試、信心值 / 確認流程、食物照片、語音（先做 spike 驗證 OpenRouter 音訊輸入） | |
+| 3 AI Gateway | OpenRouter、Model Profile 設定、Zod 驗證與重試、信心值 / 確認流程、食物照片、語音（先做 spike 驗證 OpenRouter 音訊輸入） | ✅ |
 | 4 Health Records | 報告上傳（pdf.js 轉圖）、檢驗項目擷取、代碼與單位正規化、Baseline 時間軸、健康目標 | |
 | 5 Lifestyle | 睡眠（含截圖）、步數、運動、症狀（**Safety Rule：胸痛、呼吸困難、暈厥、疑似過敏性休克**）、時間軸頁 | |
 | 6 Insight | 彙總服務、週回顧、趨勢圖、Today Focus、AI 洞察 | |
@@ -53,9 +53,25 @@
   編輯時時刻不變的排程保留原 id，已打勾的紀錄不受影響。
 - 尚未支援：臨時（非排程）服藥、藥物庫存提醒。
 
+## Sprint 3 實作備註
+
+- 隱私：所有 OpenRouter 請求帶 `provider: { zdr: true, data_collection: "deny" }`，只走零資料保留端點；
+  請求內容不含姓名、Email 或帳號資訊。設定頁更換模型時會檢查該模型是否有 ZDR 端點。
+- 語音：OpenRouter 已有 `/audio/transcriptions` 端點，可直接接受瀏覽器錄音（webm / m4a / ogg），
+  不需要 Workers AI 備案。流程為「錄音 → Whisper 轉文字 → fast 模型結構化 → 使用者確認」。
+- 結構化輸出：`response_format: json_schema`（strict）+ `require_parameters`，再以 Zod 驗證；
+  不符時把錯誤回饋給模型重試一次。AI schema 全欄位必填、無值用 null，提高各供應商相容性。
+- 確認流程：AI 結果先存 `ai_extractions`（status=succeeded），轉成可編輯草稿；使用者確認後才寫入各紀錄表，
+  並帶 `extraction_id`、來源與信心值。修改品名或份量時移除該品項的營養估算。
+  確認時先把 extraction 標記為 confirmed，防止重複送出。
+- 照片在瀏覽器端縮成最長邊 1600 px 的 JPEG；原始上傳檔存 R2（`users/{userId}/{kind}/{yyyy-mm}/`）。
+- 每位使用者每小時最多 60 次 AI 請求；每次請求記錄 token / 秒數 / 費用與耗時，設定頁顯示本月用量。
+- 預設模型：fast `anthropic/claude-haiku-5.5`、vision `google/gemini-3.8-flash`、asr `openai/whisper-large-v3`、
+  reasoning `anthropic/claude-sonnet-5.5`、medical_summary `anthropic/claude-opus-5.5`（皆有 ZDR 端點）。
+- 尚未支援：語音記錄用藥、症狀（Sprint 5）。
+
 ## 待驗證的技術風險
 
-- OpenRouter 的語音輸入能力與品質；備案為 Workers AI Whisper（需決定是否接受）。
 - 含媒體的備份需串流壓縮與 Drive resumable upload，避免超過 Workers 128MB 記憶體。
-- 送往 OpenRouter 的請求需限定不留存資料的供應商，並移除姓名等身分資訊。
 - 若使用 Cloudflare AI Gateway，必須關閉 prompt logging。
+- AI 營養估算的準確度需以實際使用回饋調整 prompt。

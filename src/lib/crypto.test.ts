@@ -7,6 +7,7 @@ import {
   importMasterKey,
   randomBytes,
   sha256Hex,
+  toBase64,
   toBase64Url,
   unwrapDataKey,
 } from "./crypto";
@@ -50,6 +51,11 @@ describe("crypto", () => {
     const master = await importMasterKey(masterBase64);
     const ciphertext = await encryptString(master, "hello", "a");
     await expect(decryptString(master, ciphertext, "b")).rejects.toThrow();
+  });
+
+  it("標準 base64 與 Buffer 一致（含大於分段大小的資料）", () => {
+    const bytes = Uint8Array.from({ length: 70000 }, (_, i) => (i * 31) % 256);
+    expect(toBase64(bytes)).toBe(Buffer.from(bytes).toString("base64"));
   });
 
   it("sha256Hex", async () => {

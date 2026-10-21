@@ -11,5 +11,7 @@ GOOGLE_CLIENT_SECRET=
 # 主加密金鑰：32 bytes 的 base64，產生方式：openssl rand -base64 32
 MASTER_ENCRYPTION_KEY=
 
-# Sprint 3 起使用
+# OpenRouter（AI 功能）：https://openrouter.ai/settings/keys
 OPENROUTER_API_KEY=
+# 僅本機測試用：指向假的 OpenRouter；正式環境不要設定
+# OPENROUTER_BASE_URL=http://localhost:9999

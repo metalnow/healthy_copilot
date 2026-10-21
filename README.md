@@ -77,6 +77,7 @@ Worker → Settings → Variables and Secrets，新增（類型選 Secret）：
 |---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client |
 | `MASTER_ENCRYPTION_KEY` | `openssl rand -base64 32`，請另外妥善保存，遺失後加密資料無法還原 |
+| `OPENROUTER_API_KEY` | OpenRouter API key（AI 功能）。建議在 OpenRouter 設定每月額度上限 |
 
 允許登入的帳號（`ALLOWED_EMAILS`）與自訂網域設定在 `wrangler.jsonc`，不要只在 Dashboard 修改，否則下次部署會被覆蓋。
 

@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { observations } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
+import type { ObservationSource } from "@/lib/enums";
 import {
   OBSERVATION_TYPES,
   OBSERVATION_UNITS,
@@ -21,6 +22,10 @@ export async function addObservation(
     occurredAt: Date;
     note?: string;
     context?: Record<string, unknown>;
+    source?: ObservationSource;
+    confidence?: number;
+    extractionId?: string;
+    mediaId?: string;
   },
 ) {
   const [row] = await db
@@ -31,7 +36,10 @@ export async function addObservation(
       ...eventTimeFields(input.occurredAt, user.timezone),
       values: input.values,
       unit: OBSERVATION_UNITS[input.type],
-      source: "manual",
+      source: input.source ?? "manual",
+      confidence: input.confidence,
+      extractionId: input.extractionId,
+      mediaId: input.mediaId,
       note: input.note,
       context: input.context,
       verifiedByUser: true,

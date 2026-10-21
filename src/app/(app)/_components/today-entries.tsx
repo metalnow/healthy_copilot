@@ -13,6 +13,8 @@ type Entry = {
   occurredAt: string;
   title: string;
   detail: string;
+  /** 經 AI 擷取、使用者確認的紀錄 */
+  ai: boolean;
 };
 
 export function buildEntries(
@@ -27,22 +29,35 @@ export function buildEntries(
       occurredAt: o.occurredAt,
       title: OBSERVATION_LABELS[o.type as ObservationType] ?? o.type,
       detail: formatObservation(o.type, o.values),
+      ai: o.extractionId !== null,
     })),
     ...food.map((f) => ({
       kind: "food_event" as const,
       id: f.id,
       occurredAt: f.occurredAt,
       title: MEAL_TYPE_LABELS[f.mealType],
-      detail: f.items.map((i) => (i.portion ? `${i.name} ${i.portion}` : i.name)).join("、"),
+      detail: [
+        f.items.map((i) => (i.portion ? `${i.name} ${i.portion}` : i.name)).join("、"),
+        f.totalNutrition?.kcal !== undefined ? `約 ${Math.round(f.totalNutrition.kcal)} kcal（估算）` : null,
+      ]
+        .filter(Boolean)
+        .join("・"),
+      ai: f.extractionId !== null,
     })),
     ...drinks.map((d) => ({
       kind: "drink_event" as const,
       id: d.id,
       occurredAt: d.occurredAt,
       title: DRINK_TYPE_LABELS[d.drinkType],
-      detail: [d.name, d.volumeMl ? formatMl(d.volumeMl) : null, d.alcoholG ? `酒精 ${d.alcoholG} g` : null]
+      detail: [
+        d.name,
+        d.volumeMl ? formatMl(d.volumeMl) : null,
+        d.caffeineMg ? `咖啡因 ${Math.round(d.caffeineMg)} mg` : null,
+        d.alcoholG ? `酒精 ${d.alcoholG} g` : null,
+      ]
         .filter(Boolean)
         .join("・"),
+      ai: d.extractionId !== null,
     })),
   ].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 }
@@ -63,8 +78,13 @@ export function TodayEntries({ entries, timeZone }: { entries: Entry[]; timeZone
                 {toLocalTime(entry.occurredAt, timeZone)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{entry.title}</p>
-                <p className="truncate text-sm text-muted">{entry.detail}</p>
+                <p className="text-sm font-medium">
+                  {entry.title}
+                  {entry.ai && (
+                    <span className="ml-2 rounded bg-accent/10 px-1.5 py-0.5 text-xs font-normal text-accent">AI</span>
+                  )}
+                </p>
+                <p className="line-clamp-2 text-sm text-muted">{entry.detail}</p>
               </div>
               <form action={deleteEntry}>
                 <input type="hidden" name="kind" value={entry.kind} />

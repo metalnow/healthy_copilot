@@ -55,6 +55,25 @@ src/
 
 Next 16 預設的 Cache Components 未啟用：所有頁面都是個人化健康資料，不在伺服器端快取。
 
+## AI 流程
+
+```text
+瀏覽器：拍照（縮圖）/ 錄音 / 文字
+   │ POST /api/ai/{food-photo,voice,text}（驗證登入、同源）
+   ▼
+src/server/ai/tasks.ts
+   ├─ 原始檔存 R2，建立 ai_extractions（pending）
+   ├─ OpenRouter（zdr、data_collection=deny）
+   │    vision → 照片辨識；asr → 轉文字；fast → 結構化
+   ├─ Zod 驗證，不符則回饋錯誤重試
+   └─ ai_extractions（succeeded，含用量與耗時）→ 回傳可編輯草稿
+   ▼
+使用者確認 / 修改 → confirmAiDraft → 寫入各紀錄表（source、confidence、extraction_id）
+```
+
+模型依用途（`fast`、`vision`、`asr`、`reasoning`、`medical_summary`）設定，預設值在
+`src/lib/ai/model-profiles.ts`，可在「設定 → AI 模型」覆寫（存於 `model_profiles`）。
+
 ## 加密
 
 - `MASTER_ENCRYPTION_KEY`（Worker secret）只用來包裝每位使用者的 DEK。

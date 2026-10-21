@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ComingSoon } from "@/components/coming-soon";
 import { requireUser } from "@/lib/auth/dal";
 
@@ -31,7 +32,16 @@ export default async function SettingsPage() {
         </form>
       </section>
 
-      <ComingSoon title="AI 模型設定" sprint="Sprint 3" items={["各任務的 OpenRouter 模型配置"]} />
+      <Link
+        href="/settings/ai"
+        className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 hover:border-accent"
+      >
+        <span>
+          <span className="block font-medium">AI 模型</span>
+          <span className="text-sm text-muted">各用途使用的模型、本月用量</span>
+        </span>
+        <span className="text-muted">›</span>
+      </Link>
       <ComingSoon
         title="Google Drive 備份"
         sprint="Sprint 7"

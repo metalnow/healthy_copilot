@@ -17,5 +17,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 列舉值放 `src/lib/enums.ts`，讓 DB 與 Zod 共用。
 - 事件時間存 UTC ISO + `local_date` + `timezone`（用 `src/lib/time.ts`）。
 - 稽核紀錄與 log 不可包含健康內容。AI 估算值必須標示來源與信心值，並經使用者確認。
+- AI 一律經 `src/lib/ai/openrouter.ts`（帶 ZDR 隱私參數），結果先存 `ai_extractions`、經使用者確認才寫入紀錄；
+  送給模型的內容不得包含使用者身分資訊。
 - 介面只做繁體中文。
 - 提交前執行 `npm run check`。
