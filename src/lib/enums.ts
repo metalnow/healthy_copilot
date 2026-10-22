@@ -49,7 +49,7 @@ export const GOAL_DIRECTIONS = ["increase", "decrease", "maintain"] as const;
 
 export const GOAL_STATUSES = ["active", "achieved", "paused"] as const;
 
-export const MEDIA_KINDS = ["health_report", "food_photo", "sleep_screenshot", "audio"] as const;
+export const MEDIA_KINDS = ["health_report", "food_photo", "sleep_screenshot", "medication_photo", "audio"] as const;
 
 export const HEALTH_DOCUMENT_STATUSES = ["uploaded", "extracting", "review", "confirmed", "failed"] as const;
 
@@ -57,6 +57,7 @@ export const AI_TASKS = [
   "food_vision",
   "report_vision",
   "sleep_screenshot",
+  "medication_label",
   "voice_input",
   "text_parse",
 ] as const;

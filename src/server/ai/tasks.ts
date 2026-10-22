@@ -9,11 +9,22 @@ import {
   type DraftEvent,
 } from "@/lib/ai/draft";
 import { AiError, transcribe, type OpenRouterConfig } from "@/lib/ai/openrouter";
-import { FOOD_PHOTO_SYSTEM_PROMPT, SLEEP_SCREENSHOT_SYSTEM_PROMPT, textParseSystemPrompt } from "@/lib/ai/prompts";
-import { FoodPhotoResultSchema, SleepScreenshotSchema, TextParseResultSchema } from "@/lib/ai/schemas";
+import {
+  FOOD_PHOTO_SYSTEM_PROMPT,
+  MEDICATION_LABEL_SYSTEM_PROMPT,
+  SLEEP_SCREENSHOT_SYSTEM_PROMPT,
+  textParseSystemPrompt,
+} from "@/lib/ai/prompts";
+import {
+  FoodPhotoResultSchema,
+  MedicationLabelSchema,
+  SleepScreenshotSchema,
+  TextParseResultSchema,
+} from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
 import type { AI_TASKS } from "@/lib/enums";
 import { WEEKDAY_LABELS } from "@/lib/labels";
+import { medicationDraftFromLabel, type MedicationDraft } from "@/lib/medication/label";
 import { resolveSleepTimes } from "@/lib/sleep";
 import { toDateTimeLocalValue, toLocalDate, weekdayOfLocalDate } from "@/lib/time";
 import { putMedia } from "@/server/media";
@@ -47,6 +58,8 @@ export type AiTaskResult = {
   unparsed?: string;
   /** 睡眠截圖的擷取結果（task = sleep_screenshot） */
   sleep?: SleepDraft;
+  /** 藥品 / 保健品照片的擷取結果（task = medication_label） */
+  medication?: MedicationDraft;
   confidence?: number;
   mediaId?: string;
 };
@@ -311,6 +324,45 @@ export async function analyzeSleepScreenshot(
               hrvMs: positive(data.hrvMs),
             }
           : undefined,
+      },
+      parsedOutput: { ...data, mediaId },
+      rawOutput: response.raw,
+      confidence: data.confidence,
+    };
+  });
+}
+
+export async function analyzeMedicationPhoto(
+  db: Db,
+  env: Env,
+  user: SessionUser,
+  image: { bytes: Uint8Array<ArrayBuffer>; mimeType: string; filename?: string },
+): Promise<AiTaskResult> {
+  const mediaId = await putMedia(db, env.MEDIA, user.id, { kind: "medication_photo", ...image });
+
+  return runTask(db, env, user, { task: "medication_label", primaryProfile: "vision", mediaIds: [mediaId] }, async ({ config, steps }) => {
+    const profile = await getModelProfile(db, "vision");
+    const response = await generateStructured(config, {
+      model: profile.modelId,
+      maxTokens: profile.maxTokens,
+      system: MEDICATION_LABEL_SYSTEM_PROMPT,
+      user: [
+        { type: "text", text: "請讀出這張照片中的藥品或保健品資訊。" },
+        { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${toBase64(image.bytes)}` } },
+      ],
+      schema: MedicationLabelSchema,
+      schemaName: "medication_label",
+    });
+    steps.push({ profile: "vision", modelId: response.model, ...response.usage });
+
+    const data = response.data;
+    return {
+      result: {
+        drafts: [],
+        mediaId,
+        confidence: Math.min(1, Math.max(0, data.confidence)),
+        notes: data.isMedication ? (data.notes ?? undefined) : "照片看起來不是藥品或保健品。",
+        medication: data.isMedication ? medicationDraftFromLabel(data) : undefined,
       },
       parsedOutput: { ...data, mediaId },
       rawOutput: response.raw,

@@ -13,6 +13,7 @@ import {
   setMedicationActive,
   updateMedication,
 } from "@/server/medications";
+import { getExtraction, settleExtraction } from "@/server/ai/extractions";
 
 export async function saveMedication(
   medicationId: string | null,
@@ -36,7 +37,17 @@ export async function saveMedication(
     await recordAudit(db, { userId: user.id, action: "medication.update", entityId: medicationId });
   } else {
     const id = await createMedication(db, user.id, parsed.medication, parsed.schedules);
-    await recordAudit(db, { userId: user.id, action: "medication.create", entityId: id });
+    // 從照片新增：使用者確認後才把 AI 擷取紀錄標為已確認
+    const extractionId = formString(formData, "extractionId");
+    const extraction = extractionId ? await getExtraction(db, user.id, extractionId) : undefined;
+    const viaPhoto =
+      extraction?.task === "medication_label" && (await settleExtraction(db, user.id, extraction.id, "confirmed"));
+    await recordAudit(db, {
+      userId: user.id,
+      action: "medication.create",
+      entityId: id,
+      metadata: viaPhoto ? { via: "photo" } : undefined,
+    });
   }
   redirect("/medications");
 }

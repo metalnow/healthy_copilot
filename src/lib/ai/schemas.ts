@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { DRINK_TYPES, EXERCISE_TYPES, INTENSITIES, MEAL_TYPES } from "@/lib/enums";
+import {
+  DRINK_TYPES,
+  EXERCISE_TYPES,
+  INTENSITIES,
+  MEAL_TYPES,
+  MEDICATION_CATEGORIES,
+  MEDICATION_TIMINGS,
+} from "@/lib/enums";
 import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import { OBSERVATION_TYPES } from "@/lib/schemas/observation";
 
@@ -132,6 +139,19 @@ export const SleepScreenshotSchema = z.strictObject({
   notes: z.string().nullable(),
 });
 export type SleepScreenshot = z.infer<typeof SleepScreenshotSchema>;
+
+export const MedicationLabelSchema = z.strictObject({
+  isMedication: z.boolean().describe("照片是否為藥品、保健品的包裝、標籤或藥袋"),
+  name: z.string().nullable().describe("品名（含規格，例如 Vitamin D3 1000 IU）"),
+  category: z.enum(MEDICATION_CATEGORIES).nullable().describe("prescription 處方藥（藥袋）、otc 成藥、supplement 保健品"),
+  dosePerIntake: num.describe("標示的每次服用量（數字）"),
+  unit: z.string().nullable().describe("每次服用量的單位，例如 顆、錠、粒、包、mL"),
+  timing: z.enum(MEDICATION_TIMINGS).nullable().describe("標示的服用時機；沒寫填 null"),
+  timesPerDay: num.describe("標示的每日服用次數"),
+  confidence: z.number().describe("整體信心 0–1"),
+  notes: z.string().nullable().describe("給使用者的補充，例如字跡模糊"),
+});
+export type MedicationLabel = z.infer<typeof MedicationLabelSchema>;
 
 export const ReviewOutputSchema = z.strictObject({
   headline: z.string().describe("一句話總結這段期間"),
