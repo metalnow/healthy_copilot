@@ -4,7 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 export const inputClass =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-warning";
+  "w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-warning";
 
 export function Field({
   label,
@@ -44,16 +44,19 @@ export function FormError({ message }: { message?: string }) {
   );
 }
 
+/** 送出按鈕：固定在畫面底部（像 App 的主要動作），表單很長時也不用捲到底 */
 export function SubmitButton({ children }: { children: ReactNode }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground disabled:opacity-60"
-    >
-      {pending ? "儲存中…" : children}
-    </button>
+    <div className="sticky bottom-0 z-10 -mx-4 bg-gradient-to-t from-background via-background to-transparent px-4 pt-4 pb-[max(env(safe-area-inset-bottom),1rem)]">
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-full rounded-xl bg-accent px-4 py-3.5 font-medium text-accent-foreground shadow-sm transition active:scale-[0.98] disabled:opacity-60"
+      >
+        {pending ? "儲存中…" : children}
+      </button>
+    </div>
   );
 }
 
@@ -86,7 +89,7 @@ export function ChipGroup<T extends string>({
               ? { checked: value === option.value, onChange: () => onChange?.(option.value) }
               : { defaultChecked: defaultValue === option.value })}
           />
-          <span className="block rounded-full border border-border px-3 py-1.5 text-sm peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40">
+          <span className="block rounded-full border border-border px-3.5 py-2 text-sm transition active:scale-95 peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40">
             {option.label}
           </span>
         </label>

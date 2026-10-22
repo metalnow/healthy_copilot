@@ -1,3 +1,23 @@
+import {
+  Activity,
+  Camera,
+  Dumbbell,
+  FileText,
+  Footprints,
+  GlassWater,
+  HeartPulse,
+  Keyboard,
+  Mic,
+  Moon,
+  Pill,
+  Plus,
+  Ruler,
+  Scale,
+  Sparkles,
+  Thermometer,
+  Utensils,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
@@ -30,24 +50,18 @@ import { EntryList } from "./_components/entry-list";
 import { MedicationChecklist } from "./_components/medication-checklist";
 import { SafetyBanner } from "./_components/safety-banner";
 
-const QUICK_ADD = [
-  { href: "/log/measurement/weight", label: "體重" },
-  { href: "/log/measurement/blood_pressure", label: "血壓" },
-  { href: "/log/measurement/heart_rate", label: "心率" },
-  { href: "/log/measurement/waist", label: "腰圍" },
-  { href: "/log/food", label: "飲食" },
-  { href: "/log/drink", label: "飲水" },
-  { href: "/log/sleep", label: "睡眠" },
-  { href: "/log/activity", label: "步數" },
-  { href: "/log/exercise", label: "運動" },
-  { href: "/log/symptom", label: "症狀" },
-] as const;
+const AI_MODES: { mode: string; label: string; icon: LucideIcon }[] = [
+  { mode: "photo", label: "拍餐點", icon: Camera },
+  { mode: "voice", label: "說一句", icon: Mic },
+  { mode: "text", label: "打一句", icon: Keyboard },
+];
 
-const AI_MODES = [
-  { mode: "photo", label: "📷 拍餐點" },
-  { mode: "voice", label: "🎤 說一句" },
-  { mode: "text", label: "⌨️ 打一句" },
-] as const;
+const OBSERVATION_ICONS: Record<ObservationType, LucideIcon> = {
+  weight: Scale,
+  blood_pressure: Activity,
+  heart_rate: HeartPulse,
+  waist: Ruler,
+};
 
 const STEP_GOAL = 8000;
 
@@ -70,38 +84,65 @@ function safetyAlerts(todayObservations: ObservationRow[], symptoms: SymptomRow[
   return [...new Map(alerts.map((a) => [a.ruleId, a])).values()].sort((a, b) => order[a.level] - order[b.level]);
 }
 
-function MetricCard({
+/** 今日磚塊：點一下就進入記錄（或管理）畫面；沒有今日資料時顯示「記錄」 */
+function Tile({
   label,
+  icon: Icon,
+  href,
   value,
   sub,
-  href,
-  muted,
+  stale,
+  cta = "記錄",
 }: {
   label: string;
-  value: string;
+  icon: LucideIcon;
+  href: string;
+  value?: string;
   sub?: string;
-  href?: string;
-  muted?: boolean;
+  /** 顯示的是過去的數值（灰色） */
+  stale?: boolean;
+  cta?: string;
 }) {
-  const body = (
-    <>
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className={`mt-1 text-lg font-medium ${muted ? "text-muted" : ""}`}>{value}</dd>
-      {sub && <dd className="text-xs text-muted">{sub}</dd>}
-    </>
-  );
-  const className = "block h-full rounded-xl border border-border bg-surface p-3";
   return (
-    <div>
-      {href ? (
-        <Link href={href} className={`${className} hover:border-accent`}>
-          {body}
-        </Link>
-      ) : (
-        <div className={className}>{body}</div>
-      )}
-    </div>
+    <li>
+      <Link
+        href={href}
+        className="flex h-full min-h-24 flex-col justify-between gap-2 rounded-2xl border border-border bg-surface p-3 transition active:scale-[0.97] active:bg-accent/5"
+      >
+        <span className="flex items-center gap-1.5 text-xs text-muted">
+          <Icon aria-hidden className={`size-4 ${value && !stale ? "text-accent" : ""}`} />
+          {label}
+        </span>
+        {value ? (
+          <span className="leading-tight">
+            <span className={`block truncate text-base font-semibold tabular-nums ${stale ? "text-muted" : ""}`}>{value}</span>
+            {sub && <span className="block truncate text-[11px] text-muted">{sub}</span>}
+          </span>
+        ) : (
+          <span className="leading-tight">
+            <span className="flex items-center gap-0.5 text-sm text-accent">
+              <Plus aria-hidden className="size-4" />
+              {cta}
+            </span>
+            {sub && <span className="block truncate text-[11px] text-muted">{sub}</span>}
+          </span>
+        )}
+      </Link>
+    </li>
   );
+}
+
+/** 2026-10-22 → 10月22日 星期四 */
+function longDate(localDate: string) {
+  const [y, m, d] = localDate.split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("zh-TW", { weekday: "long", timeZone: "UTC" });
+  return `${m}月${d}日 ${weekday}`;
+}
+
+/** 磚塊上的短數值：血壓不帶單位，例如「128/82」 */
+function shortObservation(type: ObservationType, values: Record<string, number | string>) {
+  if (type === "blood_pressure") return `${values.systolic}/${values.diastolic}`;
+  return formatObservation(type, values);
 }
 
 export default async function TodayPage() {
@@ -140,102 +181,106 @@ export default async function TodayPage() {
   const sleepMin = lastNight ? sleepDurationMin(lastNight) : null;
   const exerciseMin = lifestyle.exercise.reduce((sum, e) => sum + e.durationMin, 0);
 
+  const alerts = safetyAlerts(todayObservations, symptoms);
+  const todaySymptoms = lifestyle.symptoms.length;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">今日</h1>
-        <p className="text-sm text-muted">{today}</p>
+        <p className="text-sm text-muted">{longDate(today)}</p>
+        <h1 className="text-2xl font-bold tracking-tight">今日</h1>
       </div>
 
-      <SafetyBanner alerts={safetyAlerts(todayObservations, symptoms)} />
+      <SafetyBanner alerts={alerts} />
 
-      <nav aria-label="AI 快速記錄" className="grid grid-cols-3 gap-2">
-        {AI_MODES.map((item) => (
-          <Link
-            key={item.mode}
-            href={`/log/ai?mode=${item.mode}`}
-            className="rounded-xl bg-accent px-2 py-3 text-center text-sm font-medium text-accent-foreground"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      <section aria-labelledby="ai-heading" className="rounded-2xl bg-accent p-4 text-accent-foreground">
+        <h2 id="ai-heading" className="flex items-center gap-1.5 text-sm font-semibold">
+          <Sparkles aria-hidden className="size-4" />
+          AI 快速記錄
+        </h2>
+        <ul className="mt-3 grid grid-cols-3 gap-2">
+          {AI_MODES.map(({ mode, label, icon: Icon }) => (
+            <li key={mode}>
+              <Link
+                href={`/log/ai?mode=${mode}`}
+                className="flex flex-col items-center gap-1 rounded-xl bg-accent-foreground/15 py-3 text-sm font-medium transition active:scale-95 active:bg-accent-foreground/25"
+              >
+                <Icon aria-hidden className="size-6" />
+                {label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-      <nav aria-label="快速記錄" className="grid grid-cols-5 gap-2">
-        {QUICK_ADD.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded-lg border border-border bg-surface px-1 py-2 text-center text-sm hover:border-accent"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-
-      <section aria-labelledby="today-metrics">
-        <h2 id="today-metrics" className="sr-only">
+      <section aria-labelledby="today-metrics" className="space-y-3">
+        <h2 id="today-metrics" className="font-semibold">
           今日數據
         </h2>
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {OBSERVATION_TYPES.map((type) => {
             const row = latest[type];
             const isToday = row?.localDate === today;
             return (
-              <MetricCard
+              <Tile
                 key={type}
                 label={OBSERVATION_LABELS[type]}
+                icon={OBSERVATION_ICONS[type]}
                 href={`/log/measurement/${type}`}
-                value={row ? formatObservation(type, row.values) : "尚未記錄"}
+                value={row ? shortObservation(type, row.values) : undefined}
                 sub={row && !isToday ? `上次 ${formatShortDate(row.localDate)}` : undefined}
-                muted={!isToday}
+                stale={!isToday}
               />
             );
           })}
-          <MetricCard
+          <Tile
             label="步數"
+            icon={Footprints}
             href="/log/activity"
-            value={steps > 0 ? `${steps.toLocaleString("zh-TW")} / ${STEP_GOAL.toLocaleString("zh-TW")}` : "尚未記錄"}
-            sub={exerciseMin > 0 ? `運動 ${Math.round(exerciseMin)} 分鐘` : undefined}
-            muted={steps === 0}
+            value={steps > 0 ? steps.toLocaleString("zh-TW") : undefined}
+            sub={steps > 0 ? `目標 ${STEP_GOAL.toLocaleString("zh-TW")}` : undefined}
           />
-          <MetricCard
-            label="睡眠"
-            href="/log/sleep"
-            value={lastNight ? formatDuration(sleepMin) : "尚未記錄"}
-            muted={!lastNight}
-          />
-          <MetricCard
-            label="飲食"
-            href="/log/food"
-            value={food.length > 0 ? `${food.length} 筆` : "尚未記錄"}
-            muted={food.length === 0}
-          />
-          <MetricCard
+          <Tile label="睡眠" icon={Moon} href="/log/sleep" value={lastNight ? formatDuration(sleepMin) : undefined} />
+          <Tile label="飲食" icon={Utensils} href="/log/food" value={food.length > 0 ? `${food.length} 筆` : undefined} />
+          <Tile
             label="飲水"
+            icon={GlassWater}
             href="/log/drink"
-            value={waterMl > 0 ? `水 ${formatMl(waterMl)}` : "尚未記錄"}
+            value={drinks.length > 0 ? formatMl(waterMl) : undefined}
             sub={otherDrinks > 0 ? `其他飲料 ${otherDrinks} 杯` : undefined}
-            muted={drinks.length === 0}
           />
-          <MetricCard
+          <Tile
+            label="運動"
+            icon={Dumbbell}
+            href="/log/exercise"
+            value={exerciseMin > 0 ? `${Math.round(exerciseMin)} 分鐘` : undefined}
+          />
+          <Tile
+            label="症狀"
+            icon={Thermometer}
+            href="/log/symptom"
+            value={todaySymptoms > 0 ? `${todaySymptoms} 筆` : undefined}
+          />
+          <Tile
             label="用藥"
+            icon={Pill}
             href="/medications"
-            value={checklist.length > 0 ? `${medsDone} / ${checklist.length}` : "今日無"}
-            muted={checklist.length === 0}
+            value={checklist.length > 0 ? `${medsDone} / ${checklist.length}` : undefined}
+            sub={checklist.length === 0 ? "管理藥物" : undefined}
           />
-        </dl>
+          <Tile label="檢驗報告" icon={FileText} href="/health/reports/new" cta="上傳" />
+        </ul>
       </section>
 
       <MedicationChecklist items={checklist} localDate={today} timeZone={user.timezone} />
 
       <section aria-labelledby="entries-heading" className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 id="entries-heading" className="font-medium">
+          <h2 id="entries-heading" className="font-semibold">
             今日紀錄
           </h2>
           <Link href="/timeline" className="text-sm text-accent">
-            時間軸
+            全部
           </Link>
         </div>
         {entries.length === 0 ? <p className="text-sm text-muted">今天還沒有紀錄。</p> : <EntryList items={entries} />}
@@ -243,7 +288,7 @@ export default async function TodayPage() {
 
       <section aria-labelledby="focus-heading" className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 id="focus-heading" className="font-medium">
+          <h2 id="focus-heading" className="font-semibold">
             洞察與今日重點
           </h2>
           <Link href="/insights" className="text-sm text-accent">
@@ -253,7 +298,7 @@ export default async function TodayPage() {
         {insights.length > 0 && (
           <ul className="space-y-2">
             {insights.map((insight) => (
-              <li key={insight.id} className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+              <li key={insight.id} className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
                 {insight.tone === "positive" ? "👍 " : insight.tone === "attention" ? "⚠ " : "• "}
                 {insight.text}
               </li>
@@ -263,7 +308,7 @@ export default async function TodayPage() {
         {focus.length > 0 ? (
           <ol className="space-y-2">
             {focus.map((f, i) => (
-              <li key={f.action} className="rounded-xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm">
+              <li key={f.action} className="rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm">
                 <span className="font-medium">
                   {i + 1}. {f.action}
                 </span>

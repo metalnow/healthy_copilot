@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "報告" };
 export default function ReportsPage() {
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">報告</h1>
+      <h1 className="text-2xl font-bold tracking-tight">報告</h1>
       <ComingSoon
         title="Doctor Summary"
         sprint="P1"

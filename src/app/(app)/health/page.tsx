@@ -14,7 +14,7 @@ function Card({ title, action, children }: { title: string; action?: React.React
   return (
     <section className="space-y-3 rounded-xl border border-border bg-surface p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-medium">{title}</h2>
+        <h2 className="font-semibold">{title}</h2>
         {action}
       </div>
       {children}
@@ -53,7 +53,7 @@ export default async function HealthPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">健康</h1>
+      <h1 className="text-2xl font-bold tracking-tight">健康</h1>
 
       <div className="grid grid-cols-2 gap-2">
         <Link
@@ -105,7 +105,7 @@ export default async function HealthPage() {
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="font-medium">檢驗結果（Baseline）</h2>
+          <h2 className="font-semibold">檢驗結果（Baseline）</h2>
           <Link href="/health/reports" className="text-sm text-accent">
             報告（{documents.length}）
           </Link>

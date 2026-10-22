@@ -1,3 +1,4 @@
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
 export function PageHeader({
@@ -10,11 +11,15 @@ export function PageHeader({
   backLabel?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <Link href={backHref} className="text-sm text-muted">
-        ← {backLabel}
+    <div className="-ml-2 flex items-center gap-1">
+      <Link
+        href={backHref}
+        aria-label={`返回${backLabel}`}
+        className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted active:bg-border/60"
+      >
+        <ChevronLeft aria-hidden className="size-6" />
       </Link>
-      <h1 className="text-xl font-semibold">{title}</h1>
+      <h1 className="min-w-0 truncate text-xl font-semibold">{title}</h1>
     </div>
   );
 }

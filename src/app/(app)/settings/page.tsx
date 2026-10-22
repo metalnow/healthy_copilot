@@ -9,10 +9,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">設定</h1>
+      <h1 className="text-2xl font-bold tracking-tight">設定</h1>
 
       <section className="rounded-xl border border-border bg-surface p-4">
-        <h2 className="font-medium">Google 帳號</h2>
+        <h2 className="font-semibold">Google 帳號</h2>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-muted">名稱</dt>
           <dd>{user.name ?? "—"}</dd>

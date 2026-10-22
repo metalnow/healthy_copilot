@@ -47,7 +47,7 @@ export default async function AiSettingsPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="font-medium">各用途使用的模型</h2>
+          <h2 className="font-semibold">各用途使用的模型</h2>
           <p className="text-sm text-muted">
             填入 OpenRouter 的模型 ID。儲存時會檢查模型是否存在、支援該用途，且具備零資料保留（ZDR）端點。
           </p>
@@ -83,7 +83,7 @@ export default async function AiSettingsPage() {
       </section>
 
       <section className="space-y-2 rounded-xl border border-border bg-surface p-4">
-        <h2 className="font-medium">AI 原始回應紀錄</h2>
+        <h2 className="font-semibold">AI 原始回應紀錄</h2>
         <p className="text-sm text-muted">
           結構化結果一律保存，以便追溯與修正。開啟後會另外保存模型的原始回應文字，僅供除錯使用；預設關閉。
         </p>

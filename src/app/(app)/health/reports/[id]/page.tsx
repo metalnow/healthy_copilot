@@ -101,7 +101,7 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
 
       {doc.status === "confirmed" && (
         <section className="space-y-2">
-          <h2 className="font-medium">已儲存 {saved.length} 項</h2>
+          <h2 className="font-semibold">已儲存 {saved.length} 項</h2>
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {saved.map((row) => (
               <li key={row.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">

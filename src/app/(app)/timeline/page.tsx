@@ -43,7 +43,7 @@ export default async function TimelinePage({ searchParams }: PageProps<"/timelin
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">時間軸</h1>
+        <h1 className="text-2xl font-bold tracking-tight">時間軸</h1>
         <p className="text-sm text-muted">
           {from} – {before}
         </p>
@@ -74,7 +74,7 @@ export default async function TimelinePage({ searchParams }: PageProps<"/timelin
       ) : (
         [...byDate.entries()].map(([date, dayItems]) => (
           <section key={date} className="space-y-2">
-            <h2 className="text-sm font-medium text-muted">
+            <h2 className="text-sm font-semibold text-muted">
               {date === today ? "今天" : date}（{WEEKDAY_LABELS[weekdayOfLocalDate(date)]}）
             </h2>
             <EntryList items={dayItems} />

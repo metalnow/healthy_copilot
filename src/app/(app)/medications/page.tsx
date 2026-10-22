@@ -73,7 +73,7 @@ export default async function MedicationsPage() {
 
       {inactive.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted">已停用</h2>
+          <h2 className="text-sm font-semibold text-muted">已停用</h2>
           <ul className="space-y-3 opacity-70">
             {inactive.map((med) => (
               <MedicationCard key={med.id} med={med} />
