@@ -69,6 +69,16 @@ Workers & Pages → Create → Import a repository，選 `metalnow/healthy_copil
 
 注意：Build command 不能用 `npm run build`，那只會跑 `next build`，不會產生 Worker 需要的 `.open-next/`。
 
+Production branch 設為 `main`（Settings → Builds → Branch control）。只有推送到 `main` 的 commit 會部署到正式站；
+其他分支的推送只會產生預覽版本（若有開啟）。修改 production branch 不會自動觸發建置，要等下一次推送。
+Node.js 版本由 `.node-version` 指定（22）。
+
+若正式站沒有更新：
+
+1. Worker → Deployments 看最新部署對應的 commit。
+2. Settings → Builds 的建置紀錄看是否有失敗的 build，點進去看 log。
+3. 確認 Git 連線的 repository 與 production branch 正確。
+
 ### 3. 設定 Secrets
 
 Worker → Settings → Variables and Secrets，新增（類型選 Secret）：
