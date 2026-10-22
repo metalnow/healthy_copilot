@@ -77,7 +77,9 @@ Node.js 版本由 `.node-version` 指定（22）。
 
 1. Worker → Deployments 看最新部署對應的 commit。
 2. Settings → Builds 的建置紀錄看是否有失敗的 build，點進去看 log。
-3. 確認 Git 連線的 repository 與 production branch 正確。
+3. 確認 Git 連線的 repository 與 production branch 正確。重新連結 Git 後要再檢查一次 production branch，
+   並確認 Settings → Builds → Trigger events 有勾選推送到 production branch 時建置。
+4. 修改設定不會觸發建置；改完後需要再推送一個 commit 到 `main`。
 
 ### 3. 設定 Secrets
 
