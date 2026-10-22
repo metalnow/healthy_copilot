@@ -9,9 +9,9 @@ import { eventTimeFields } from "@/lib/time";
 
 type FoodInputType = (typeof INPUT_TYPES)[number];
 
-export type FoodItemDraft = { name: string; portion?: string };
+export type FoodItemDraft = { name: string; portion?: string; nutrition?: NutritionEstimate };
 
-type FoodItemInput = FoodItemDraft & { nutrition?: NutritionEstimate; confidence?: number };
+type FoodItemInput = FoodItemDraft & { confidence?: number };
 
 export async function addFoodEvent(
   db: Db,
@@ -170,11 +170,63 @@ export async function lastMealItems(
     .limit(1);
   if (!event) return [];
   const items = await db
-    .select({ name: foodItems.name, portion: foodItems.portion })
+    .select({ name: foodItems.name, portion: foodItems.portion, nutrition: foodItems.nutrition })
     .from(foodItems)
     .where(eq(foodItems.foodEventId, event.id))
     .orderBy(foodItems.position);
-  return items.map((i) => ({ name: i.name, portion: i.portion ?? undefined }));
+  return items.map((i) => ({ name: i.name, portion: i.portion ?? undefined, nutrition: i.nutrition ?? undefined }));
+}
+
+export async function getFoodEvent(db: Db, userId: string, id: string) {
+  const [event] = await db
+    .select()
+    .from(foodEvents)
+    .where(and(eq(foodEvents.id, id), eq(foodEvents.userId, userId)))
+    .limit(1);
+  if (!event) return null;
+  const items = await db.select().from(foodItems).where(eq(foodItems.foodEventId, id)).orderBy(foodItems.position);
+  return { ...event, items };
+}
+
+/** 修改餐別、時間、備註與品項；品項整批替換（保留原本的 AI 來源資訊） */
+export async function updateFoodEvent(
+  db: Db,
+  user: SessionUser,
+  id: string,
+  input: {
+    mealType: MealType;
+    occurredAt: Date;
+    items: FoodItemInput[];
+    note?: string;
+    totalNutrition?: NutritionEstimate;
+  },
+) {
+  const existing = await getFoodEvent(db, user.id, id);
+  if (!existing) return false;
+  await db.batch([
+    db
+      .update(foodEvents)
+      .set({
+        mealType: input.mealType,
+        ...eventTimeFields(input.occurredAt, user.timezone),
+        note: input.note ?? null,
+        totalNutrition: input.totalNutrition ?? null,
+      })
+      .where(and(eq(foodEvents.id, id), eq(foodEvents.userId, user.id))),
+    db.delete(foodItems).where(eq(foodItems.foodEventId, id)),
+    ...chunkForInsert(
+      foodItems,
+      input.items.map((item, position) => ({
+        foodEventId: id,
+        position,
+        name: item.name,
+        portion: item.portion,
+        nutrition: item.nutrition,
+        confidence: item.confidence,
+      })),
+    ).map((rows) => db.insert(foodItems).values(rows)),
+  ]);
+  return true;
 }
 
 export async function deleteFoodEvent(db: Db, userId: string, id: string) {

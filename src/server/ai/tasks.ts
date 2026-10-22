@@ -6,22 +6,26 @@ import { toBase64 } from "@/lib/crypto";
 import {
   draftFromFoodPhoto,
   draftFromTextParse,
+  toNutrition,
   type DraftEvent,
 } from "@/lib/ai/draft";
 import { AiError, transcribe, type OpenRouterConfig } from "@/lib/ai/openrouter";
 import {
+  FOOD_ESTIMATE_SYSTEM_PROMPT,
   FOOD_PHOTO_SYSTEM_PROMPT,
   MEDICATION_LABEL_SYSTEM_PROMPT,
   SLEEP_SCREENSHOT_SYSTEM_PROMPT,
   textParseSystemPrompt,
 } from "@/lib/ai/prompts";
 import {
+  FoodEstimateSchema,
   FoodPhotoResultSchema,
   MedicationLabelSchema,
   SleepScreenshotSchema,
   TextParseResultSchema,
 } from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
+import type { NutritionEstimate } from "@/lib/schemas/common";
 import type { AI_TASKS } from "@/lib/enums";
 import { WEEKDAY_LABELS } from "@/lib/labels";
 import { medicationDraftFromLabel, type MedicationDraft } from "@/lib/medication/label";
@@ -60,6 +64,8 @@ export type AiTaskResult = {
   sleep?: SleepDraft;
   /** 藥品 / 保健品照片的擷取結果（task = medication_label） */
   medication?: MedicationDraft;
+  /** 手動輸入品項的營養估算，順序與送出的品項相同（task = food_estimate） */
+  foodNutrition?: { nutrition?: NutritionEstimate; confidence: number }[];
   confidence?: number;
   mediaId?: string;
 };
@@ -367,6 +373,39 @@ export async function analyzeMedicationPhoto(
       parsedOutput: { ...data, mediaId },
       rawOutput: response.raw,
       confidence: data.confidence,
+    };
+  });
+}
+
+/** 手動輸入的品項 → 營養估算；只送品名與份量 */
+export async function estimateFoodNutrition(
+  db: Db,
+  env: Env,
+  user: SessionUser,
+  items: { name: string; portion?: string }[],
+): Promise<AiTaskResult> {
+  return runTask(db, env, user, { task: "food_estimate", primaryProfile: "fast" }, async ({ config, steps }) => {
+    const profile = await getModelProfile(db, "fast");
+    const response = await generateStructured(config, {
+      model: profile.modelId,
+      maxTokens: profile.maxTokens,
+      system: FOOD_ESTIMATE_SYSTEM_PROMPT,
+      user: JSON.stringify(items.map((i) => ({ name: i.name, portion: i.portion ?? null }))),
+      schema: FoodEstimateSchema,
+      schemaName: "food_estimate",
+    });
+    steps.push({ profile: "fast", modelId: response.model, ...response.usage });
+    if (response.data.items.length !== items.length) throw new AiError("invalid_output", "Item count mismatch");
+
+    const foodNutrition = response.data.items.map((item) => ({
+      nutrition: toNutrition(item),
+      confidence: Math.min(1, Math.max(0, item.confidence)),
+    }));
+    return {
+      result: { drafts: [], foodNutrition },
+      parsedOutput: response.data,
+      rawOutput: response.raw,
+      confidence: Math.min(...foodNutrition.map((i) => i.confidence)),
     };
   });
 }

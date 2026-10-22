@@ -83,7 +83,8 @@ export function validateMeasurementValues(event: Extract<DraftEvent, { kind: "me
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
-function toNutrition(item: AiFoodItem): NutritionEstimate | undefined {
+/** AI 的營養估算（null 表示無法估計）→ 只保留有數值的欄位 */
+export function toNutrition(item: Pick<AiFoodItem, "nutrition">): NutritionEstimate | undefined {
   const entries = Object.entries(item.nutrition).filter(
     (entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] >= 0,
   );
@@ -102,11 +103,11 @@ function toDraftItems(items: AiFoodItem[]): DraftFoodItem[] {
     }));
 }
 
-/** 加總品項營養；全部都沒有估算值時回傳 undefined */
+/** 加總品項營養；任一品項為估算值時總和也標示為估算；全部都沒有數值時回傳 undefined */
 export function sumNutrition(items: { nutrition?: NutritionEstimate }[]): NutritionEstimate | undefined {
   const withNutrition = items.filter((i) => i.nutrition);
   if (withNutrition.length === 0) return undefined;
-  const total: NutritionEstimate = { estimated: true };
+  const total: NutritionEstimate = { estimated: withNutrition.some((i) => i.nutrition!.estimated) };
   for (const { nutrition } of withNutrition) {
     for (const [key, value] of Object.entries(nutrition!)) {
       if (key === "estimated" || typeof value !== "number") continue;

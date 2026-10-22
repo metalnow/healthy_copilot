@@ -47,6 +47,8 @@ export type TimelineItem = {
   key: string;
   category: TimelineCategory;
   deleteKind?: DeletableKind;
+  /** 可修改的紀錄：點進去的編輯頁 */
+  editHref?: string;
   id: string;
   localDate: string;
   /** 排序用的 UTC 時間；整天的紀錄（步數、檢驗）為 null */
@@ -132,6 +134,7 @@ export async function getTimeline(
       key: `food:${f.id}`,
       category: "food" as const,
       deleteKind: "food_event" as const,
+      editHref: `/log/food/${f.id}`,
       id: f.id,
       localDate: f.localDate,
       ...timed(f.occurredAt),
@@ -142,7 +145,10 @@ export async function getTimeline(
           .sort((a, b) => a.position - b.position)
           .map((i) => (i.portion ? `${i.name} ${i.portion}` : i.name))
           .join("、"),
-        f.totalNutrition?.kcal !== undefined && `約 ${Math.round(f.totalNutrition.kcal)} kcal（估算）`,
+        f.totalNutrition?.kcal !== undefined &&
+          (f.totalNutrition.estimated
+            ? `約 ${Math.round(f.totalNutrition.kcal)} kcal（估算）`
+            : `${Math.round(f.totalNutrition.kcal)} kcal`),
       ),
       ai: f.extractionId !== null,
     })),

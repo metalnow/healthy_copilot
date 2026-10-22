@@ -38,6 +38,13 @@ export const AiFoodItemSchema = z.strictObject({
 });
 export type AiFoodItem = z.infer<typeof AiFoodItemSchema>;
 
+export const FoodEstimateSchema = z.strictObject({
+  items: z
+    .array(z.strictObject({ nutrition: AiNutritionSchema, confidence: z.number().describe("估算信心 0–1") }))
+    .describe("與輸入品項相同順序、相同數量"),
+});
+export type FoodEstimate = z.infer<typeof FoodEstimateSchema>;
+
 export const AiDrinkItemSchema = z.strictObject({
   drinkType: z.enum(DRINK_TYPES),
   name: z.string().nullable().describe("飲料名稱，例如 珍珠奶茶、美式咖啡"),

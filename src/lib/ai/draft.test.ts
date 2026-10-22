@@ -238,6 +238,14 @@ describe("sumNutrition", () => {
     ).toEqual({ estimated: true, kcal: 420, proteinG: 20.3 });
     expect(sumNutrition([{}])).toBeUndefined();
   });
+
+  it("全部為使用者輸入時不標示為估算", () => {
+    expect(sumNutrition([{ nutrition: { estimated: false, kcal: 500 } }, { nutrition: { estimated: false, kcal: 120 } }])).toEqual({
+      estimated: false,
+      kcal: 620,
+    });
+    expect(sumNutrition([{ nutrition: { estimated: false, kcal: 500 } }, { nutrition: { estimated: true, kcal: 100 } }])?.estimated).toBe(true);
+  });
 });
 
 describe("ConfirmDraftSchema", () => {

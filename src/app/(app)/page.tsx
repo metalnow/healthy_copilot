@@ -173,6 +173,9 @@ export default async function TodayPage() {
     review && review.periodEnd >= addDays(today, -13) ? ReviewOutputSchema.safeParse(review.output) : null;
   const focus = reviewOutput?.success ? reviewOutput.data.nextFocus.slice(0, 3) : [];
 
+  const withKcal = food.filter((f) => f.totalNutrition?.kcal !== undefined);
+  const foodKcal = withKcal.length > 0 ? withKcal.reduce((sum, f) => sum + f.totalNutrition!.kcal!, 0) : null;
+  const foodKcalEstimated = withKcal.some((f) => f.totalNutrition!.estimated);
   const waterMl = drinks.reduce((sum, d) => sum + (d.waterMl ?? 0), 0);
   // 水以外的飲料依類型計數，例如「咖啡 1・含糖飲料 2」
   const otherDrinkCounts = new Map<string, number>();
@@ -248,7 +251,13 @@ export default async function TodayPage() {
             sub={steps > 0 ? `目標 ${STEP_GOAL.toLocaleString("zh-TW")}` : undefined}
           />
           <Tile label="睡眠" icon={Moon} href="/log/sleep" value={lastNight ? formatDuration(sleepMin) : undefined} />
-          <Tile label="飲食" icon={Utensils} href="/log/food" value={food.length > 0 ? `${food.length} 筆` : undefined} />
+          <Tile
+            label="飲食"
+            icon={Utensils}
+            href="/log/food"
+            value={foodKcal !== null ? `${Math.round(foodKcal).toLocaleString("zh-TW")} kcal` : food.length > 0 ? `${food.length} 筆` : undefined}
+            sub={foodKcal !== null ? `${food.length} 筆${foodKcalEstimated ? "・含估算" : ""}` : undefined}
+          />
           <Tile
             label="飲料"
             icon={GlassWater}

@@ -11,13 +11,16 @@ import { DRINK_TYPES, MEAL_TYPES, type MealType } from "@/lib/enums";
 import { formNumber, formString, type ActionState } from "@/lib/form";
 import { parseMeasurementForm, parseOccurredAt } from "@/lib/measurement-form";
 import { OBSERVATION_TYPES, type ObservationType } from "@/lib/schemas/observation";
-import { LocalDate } from "@/lib/schemas/common";
+import { sumNutrition } from "@/lib/ai/draft";
+import { LocalDate, NutritionEstimateSchema, type NutritionEstimate } from "@/lib/schemas/common";
+import { getExtraction, settleExtraction } from "@/server/ai/extractions";
 import {
   addDrinkEvent,
   addFoodEvent,
   deleteDrinkEvent,
   deleteFoodEvent,
   lastMealItems,
+  updateFoodEvent,
   type FoodItemDraft,
 } from "@/server/food";
 import { clearMedicationEvent, recordMedicationEvent } from "@/server/medications";
@@ -65,9 +68,24 @@ export async function saveMeasurement(
 const FoodItemDraftSchema = z.object({
   name: z.string().min(1).max(100, "品名最多 100 字"),
   portion: z.string().max(50, "份量最多 50 字").optional(),
+  nutrition: NutritionEstimateSchema.refine((n) => n.kcal === undefined || n.kcal <= 10000, "熱量最多 10000 kcal").optional(),
 });
 
-export async function saveFood(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/** 表單隱藏欄位的營養 JSON；格式不對就當作沒有 */
+function parseNutritionField(value: string | undefined): NutritionEstimate | undefined {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as NutritionEstimate;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function saveFood(
+  foodEventId: string | null,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireUser();
 
   const mealType = z.enum(MEAL_TYPES).safeParse(formString(formData, "mealType"));
@@ -75,8 +93,9 @@ export async function saveFood(_prev: ActionState, formData: FormData): Promise<
 
   const names = formData.getAll("itemName").map((v) => String(v).trim());
   const portions = formData.getAll("itemPortion").map((v) => String(v).trim());
+  const nutritions = formData.getAll("itemNutrition").map((v) => parseNutritionField(String(v)));
   const rawItems = names
-    .map((name, i) => ({ name, portion: portions[i] || undefined }))
+    .map((name, i) => ({ name, portion: portions[i] || undefined, nutrition: nutritions[i] }))
     .filter((item) => item.name !== "");
   const items = z.array(FoodItemDraftSchema).min(1).max(30).safeParse(rawItems);
 
@@ -90,14 +109,29 @@ export async function saveFood(_prev: ActionState, formData: FormData): Promise<
   if (!mealType.success || "error" in time || !items.success) return { fieldErrors };
 
   const db = await getDb();
-  const id = await addFoodEvent(db, user, {
+  const values = {
     mealType: mealType.data,
     occurredAt: time.occurredAt,
-    inputType: formString(formData, "inputType") === "quick_item" ? "quick_item" : "text",
     items: items.data,
     note: formString(formData, "note")?.slice(0, 2000),
-  });
-  await recordAudit(db, { userId: user.id, action: "food_event.create", entityId: id });
+    totalNutrition: sumNutrition(items.data),
+  };
+  // 使用者按過「AI 估算熱量」並儲存，即視為確認估算結果
+  const extractionId = formString(formData, "extractionId");
+  const extraction = extractionId ? await getExtraction(db, user.id, extractionId) : null;
+  if (extraction?.task === "food_estimate") await settleExtraction(db, user.id, extraction.id, "confirmed");
+
+  if (foodEventId) {
+    if (!(await updateFoodEvent(db, user, foodEventId, values))) return { error: "找不到這筆紀錄" };
+    await recordAudit(db, { userId: user.id, action: "food_event.update", entityId: foodEventId });
+  } else {
+    const id = await addFoodEvent(db, user, {
+      ...values,
+      inputType: formString(formData, "inputType") === "quick_item" ? "quick_item" : "text",
+    });
+    await recordAudit(db, { userId: user.id, action: "food_event.create", entityId: id });
+  }
+  revalidatePath("/timeline");
   redirect("/");
 }
 

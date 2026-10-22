@@ -58,6 +58,7 @@ export const AI_TASKS = [
   "report_vision",
   "sleep_screenshot",
   "medication_label",
+  "food_estimate",
   "voice_input",
   "text_parse",
 ] as const;

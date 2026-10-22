@@ -70,6 +70,12 @@ export const SLEEP_SCREENSHOT_SYSTEM_PROMPT = `你是睡眠資料擷取助理，
 - 不是睡眠紀錄截圖時 isSleepData 為 false。
 只輸出符合 schema 的 JSON。`;
 
+export const FOOD_ESTIMATE_SYSTEM_PROMPT = `你是飲食紀錄助理，依使用者列出的品項名稱與份量估算營養。
+- 輸入是 JSON 陣列，每項有 name 與 portion（可能為 null，代表一般一人份）。
+- 依序為每個品項輸出一筆估算，數量與順序必須和輸入相同。
+${NUTRITION_RULES}
+只輸出符合 schema 的 JSON。`;
+
 export const MEDICATION_LABEL_SYSTEM_PROMPT = `你是用藥紀錄助理，從藥品或保健品的包裝、標籤、藥袋照片讀出品項資訊。
 - 只填照片上明確標示的內容，沒有的填 null，不要依常識推算劑量或次數。
 - 品名用包裝上的名稱（中文優先），保留規格，例如「維他命 D3 1000 IU」。

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { ChipGroup, FormError, inputClass } from "@/components/form";
+import { KcalInput, kcalTotal } from "@/components/kcal-input";
 import { LOW_CONFIDENCE, type DraftEvent, type DraftFoodItem } from "@/lib/ai/draft";
 import { DRINK_TYPES, EXERCISE_TYPES, MEAL_TYPES } from "@/lib/enums";
 import {
@@ -67,11 +68,16 @@ function FoodItems({
   items: DraftFoodItem[];
   onChange: (items: DraftFoodItem[]) => void;
 }) {
-  // 修改品名或份量後，原本的營養估算不再適用
+  // 修改品名或份量後，原本的 AI 估算不再適用；自行輸入的熱量保留
   const edit = (index: number, patch: Partial<DraftFoodItem>) =>
     onChange(
-      items.map((item, i) => (i === index ? { ...item, ...patch, nutrition: undefined, confidence: undefined } : item)),
+      items.map((item, i) =>
+        i === index
+          ? { ...item, ...patch, nutrition: item.nutrition?.estimated ? undefined : item.nutrition, confidence: undefined }
+          : item,
+      ),
     );
+  const total = kcalTotal(items);
 
   return (
     <div className="space-y-2">
@@ -102,8 +108,12 @@ function FoodItems({
               ✕
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2 pl-1">
-            {item.nutrition?.kcal !== undefined && <Estimate>約 {Math.round(item.nutrition.kcal)} kcal</Estimate>}
+          <div className="flex flex-wrap items-center gap-2">
+            <KcalInput
+              nutrition={item.nutrition}
+              onChange={(nutrition) => onChange(items.map((it, i) => (i === index ? { ...it, nutrition } : it)))}
+              label={`第 ${index + 1} 項熱量`}
+            />
             {item.confidence !== undefined && item.confidence < LOW_CONFIDENCE && (
               <ConfidenceBadge confidence={item.confidence} />
             )}
@@ -117,6 +127,7 @@ function FoodItems({
       >
         ＋ 新增一項
       </button>
+      {total && <p className="text-sm">合計 {total}</p>}
     </div>
   );
 }

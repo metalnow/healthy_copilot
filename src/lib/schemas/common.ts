@@ -16,7 +16,8 @@ const nonNegative = z.number().nonnegative();
 
 /** 營養估算值，一律視為 Estimated，不得與檢驗值同等可信度呈現 */
 export const NutritionEstimateSchema = z.object({
-  estimated: z.literal(true).default(true),
+  /** true：AI 估算；false：使用者自行輸入 */
+  estimated: z.boolean().default(true),
   kcal: nonNegative.optional(),
   proteinG: nonNegative.optional(),
   fatG: nonNegative.optional(),
