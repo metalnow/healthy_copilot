@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDb, getEnv } from "@/db";
 import { userSettings } from "@/db/schema";
 import { validateModelChoice } from "@/lib/ai/model-profiles";
-import { listModels, listZdrModelIds } from "@/lib/ai/openrouter";
+import { listModels, listZdrEndpointParams } from "@/lib/ai/openrouter";
 import { recordAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/dal";
 import { MODEL_PROFILE_KEYS, type ModelProfileKey } from "@/lib/enums";
@@ -26,7 +26,7 @@ export async function updateModelProfile(
   const config = { baseUrl: env.OPENROUTER_BASE_URL || undefined };
   let problem: string | null;
   try {
-    const [models, zdr] = await Promise.all([listModels(config), listZdrModelIds(config)]);
+    const [models, zdr] = await Promise.all([listModels(config), listZdrEndpointParams(config)]);
     problem = validateModelChoice(key, modelId, models, zdr);
   } catch {
     return { error: "無法取得 OpenRouter 模型清單，請稍後再試" };

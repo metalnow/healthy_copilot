@@ -48,7 +48,6 @@ export async function generateStructured<T>(
   config: OpenRouterConfig,
   request: {
     model: string;
-    temperature?: number | null;
     maxTokens?: number | null;
     system: string;
     user: string | ContentPart[];
@@ -72,7 +71,6 @@ export async function generateStructured<T>(
       model: request.model,
       messages,
       jsonSchema,
-      temperature: request.temperature,
       maxTokens: request.maxTokens,
       plugins: request.plugins,
     });

@@ -8,8 +8,15 @@ const models = new Map<string, ModelInfo>([
   ["t/text", { id: "t/text", name: "", inputModalities: ["text"], outputModalities: ["text"] }],
   ["s/stt", { id: "s/stt", name: "", inputModalities: ["audio"], outputModalities: ["transcription"] }],
   ["n/nozdr", { id: "n/nozdr", name: "", inputModalities: ["text"], outputModalities: ["text"] }],
+  ["u/unstructured", { id: "u/unstructured", name: "", inputModalities: ["text"], outputModalities: ["text"] }],
 ]);
-const zdr = new Set(["v/vision", "t/text", "s/stt"]);
+const structured = new Set(["max_tokens", "response_format"]);
+const zdr = new Map([
+  ["v/vision", structured],
+  ["t/text", structured],
+  ["s/stt", new Set<string>()],
+  ["u/unstructured", new Set(["max_tokens"])],
+]);
 
 describe("validateModelChoice", () => {
   it("接受符合用途且有 ZDR 的模型", () => {
@@ -25,5 +32,6 @@ describe("validateModelChoice", () => {
     expect(validateModelChoice("asr", "t/text", models, zdr)).toContain("語音");
     expect(validateModelChoice("fast", "s/stt", models, zdr)).toContain("文字");
     expect(validateModelChoice("fast", "n/nozdr", models, zdr)).toContain("零資料保留");
+    expect(validateModelChoice("fast", "u/unstructured", models, zdr)).toContain("結構化輸出");
   });
 });

@@ -127,7 +127,6 @@ export async function runReview(db: Db, env: Env, job: { userId: string; reviewI
     const profile = await getModelProfile(db, review.period === "weekly" ? "reasoning" : "medical_summary");
     const response = await generateStructured(openRouterConfig(env), {
       model: profile.modelId,
-      temperature: profile.temperature,
       maxTokens: profile.maxTokens,
       system: reviewSystemPrompt(review.period === "weekly" ? "weekly" : "monthly"),
       user: JSON.stringify(input),

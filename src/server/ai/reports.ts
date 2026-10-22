@@ -105,7 +105,6 @@ export async function runReportExtraction(
     const profile = await getModelProfile(db, "vision");
     const response = await generateStructured(openRouterConfig(env), {
       model: profile.modelId,
-      temperature: 0,
       maxTokens: 16000,
       system: labReportSystemPrompt(catalogForPrompt()),
       user: parts,

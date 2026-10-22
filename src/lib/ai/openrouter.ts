@@ -28,7 +28,7 @@ const ERROR_MESSAGES: Record<AiErrorCode, string> = {
   auth: "OpenRouter API Key 無效",
   insufficient_credits: "OpenRouter 額度不足",
   rate_limited: "AI 請求過於頻繁，請稍後再試",
-  no_endpoint: "這個模型目前沒有符合隱私設定（零資料保留）的服務端點，請到設定更換模型",
+  no_endpoint: "這個模型目前沒有同時符合隱私設定（零資料保留）與所需功能的服務端點，請稍後再試或到設定更換模型",
   bad_request: "AI 請求格式有誤",
   provider_error: "AI 服務暫時無法使用，請稍後再試",
   timeout: "AI 回應逾時，請稍後再試",
@@ -130,7 +130,6 @@ export async function chatCompletion(
     model: string;
     messages: ChatMessage[];
     jsonSchema?: { name: string; schema: Record<string, unknown> };
-    temperature?: number | null;
     maxTokens?: number | null;
     plugins?: unknown[];
   },
@@ -138,7 +137,6 @@ export async function chatCompletion(
   const response = await post<ChatCompletionResponse>(config, "/chat/completions", {
     model: request.model,
     messages: request.messages,
-    ...(request.temperature != null && { temperature: request.temperature }),
     ...(request.maxTokens != null && { max_tokens: request.maxTokens }),
     ...(request.plugins && { plugins: request.plugins }),
     ...(request.jsonSchema && {
@@ -227,8 +225,15 @@ export async function listModels(config: Pick<OpenRouterConfig, "baseUrl" | "fet
   return byId;
 }
 
-/** 具有 Zero Data Retention 端點的模型 id */
-export async function listZdrModelIds(config: Pick<OpenRouterConfig, "baseUrl" | "fetch"> = {}) {
+/** 具有 Zero Data Retention 端點的模型 id → 這些端點支援的參數（聯集） */
+export async function listZdrEndpointParams(config: Pick<OpenRouterConfig, "baseUrl" | "fetch"> = {}) {
   const zdr = await getJson(config, "/endpoints/zdr");
-  return new Set(((zdr.data ?? []) as { model_id?: string }[]).flatMap((e) => (e.model_id ? [e.model_id] : [])));
+  const byModel = new Map<string, Set<string>>();
+  for (const endpoint of (zdr.data ?? []) as { model_id?: string; supported_parameters?: string[] }[]) {
+    if (!endpoint.model_id) continue;
+    const params = byModel.get(endpoint.model_id) ?? new Set<string>();
+    for (const p of endpoint.supported_parameters ?? []) params.add(p);
+    byModel.set(endpoint.model_id, params);
+  }
+  return byModel;
 }

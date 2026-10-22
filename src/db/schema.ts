@@ -182,6 +182,7 @@ export const modelProfiles = sqliteTable("model_profiles", {
   key: text("key", { enum: MODEL_PROFILE_KEYS }).primaryKey(),
   provider: text("provider", { enum: ["openrouter"] }).notNull().default("openrouter"),
   modelId: text("model_id").notNull(),
+  /** 已停用：多數 ZDR 端點不支援 temperature，請求不再送出 */
   temperature: real("temperature"),
   maxTokens: integer("max_tokens"),
   updatedAt: updatedAt(),

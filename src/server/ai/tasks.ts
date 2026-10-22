@@ -130,7 +130,6 @@ export async function analyzeFoodPhoto(
     const profile = await getModelProfile(db, "vision");
     const response = await generateStructured(config, {
       model: profile.modelId,
-      temperature: profile.temperature,
       maxTokens: profile.maxTokens,
       system: FOOD_PHOTO_SYSTEM_PROMPT,
       user: [
@@ -167,7 +166,6 @@ async function parseTextWithProfile(
   const localDate = toLocalDate(now, user.timezone);
   const response = await generateStructured(config, {
     model: profile.modelId,
-    temperature: profile.temperature,
     maxTokens: profile.maxTokens,
     system: textParseSystemPrompt({
       localDate,
@@ -278,7 +276,6 @@ export async function analyzeSleepScreenshot(
     const profile = await getModelProfile(db, "vision");
     const response = await generateStructured(config, {
       model: profile.modelId,
-      temperature: 0,
       maxTokens: profile.maxTokens,
       system: SLEEP_SCREENSHOT_SYSTEM_PROMPT,
       user: [

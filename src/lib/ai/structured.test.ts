@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AiError, chatCompletion, listZdrModelIds, transcribe } from "./openrouter";
+import { AiError, chatCompletion, listZdrEndpointParams, transcribe } from "./openrouter";
 import { extractJson, generateStructured } from "./structured";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -35,7 +35,6 @@ describe("chatCompletion", () => {
         model: "m",
         messages: [{ role: "user", content: "hi" }],
         jsonSchema: { name: "s", schema: { type: "object" } },
-        temperature: 0.2,
       },
     );
     const [url, init] = fetch.mock.calls[0];
@@ -47,7 +46,7 @@ describe("chatCompletion", () => {
       type: "json_schema",
       json_schema: { name: "s", strict: true, schema: { type: "object" } },
     });
-    expect(body.temperature).toBe(0.2);
+    expect(body).not.toHaveProperty("temperature");
     expect(body).not.toHaveProperty("max_tokens");
   });
 
@@ -132,11 +131,22 @@ describe("transcribe", () => {
   });
 });
 
-describe("listZdrModelIds", () => {
-  it("取出模型 id", async () => {
-    const fetch = vi
-      .fn<typeof globalThis.fetch>()
-      .mockResolvedValue(jsonResponse({ data: [{ model_id: "a/b" }, { model_id: "a/b" }, { model_id: "c/d" }] }));
-    expect(await listZdrModelIds({ fetch })).toEqual(new Set(["a/b", "c/d"]));
+describe("listZdrEndpointParams", () => {
+  it("依模型合併各 ZDR 端點支援的參數", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      jsonResponse({
+        data: [
+          { model_id: "a/b", supported_parameters: ["max_tokens"] },
+          { model_id: "a/b", supported_parameters: ["response_format"] },
+          { model_id: "c/d" },
+        ],
+      }),
+    );
+    expect(await listZdrEndpointParams({ fetch })).toEqual(
+      new Map([
+        ["a/b", new Set(["max_tokens", "response_format"])],
+        ["c/d", new Set()],
+      ]),
+    );
   });
 });

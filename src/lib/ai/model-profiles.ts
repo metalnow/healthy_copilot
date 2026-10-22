@@ -4,22 +4,19 @@ import type { ModelInfo } from "./openrouter";
 export type ModelProfile = {
   key: ModelProfileKey;
   modelId: string;
-  temperature: number | null;
   maxTokens: number | null;
 };
 
-/** 預設模型：皆有 OpenRouter Zero Data Retention 端點；可於「設定 → AI 模型」覆寫 */
+/**
+ * 預設模型：皆有支援結構化輸出的 OpenRouter Zero Data Retention 端點；可於「設定 → AI 模型」覆寫。
+ * 不送 temperature：多數 ZDR 端點不支援，加上 require_parameters 會導致找不到端點。
+ */
 export const DEFAULT_MODEL_PROFILES: Record<ModelProfileKey, ModelProfile> = {
-  fast: { key: "fast", modelId: "anthropic/claude-haiku-5.5", temperature: 0.2, maxTokens: 4000 },
-  vision: { key: "vision", modelId: "google/gemini-3.8-flash", temperature: 0.2, maxTokens: 4000 },
-  asr: { key: "asr", modelId: "openai/whisper-large-v3", temperature: null, maxTokens: null },
-  reasoning: { key: "reasoning", modelId: "anthropic/claude-sonnet-5.5", temperature: 0.3, maxTokens: 8000 },
-  medical_summary: {
-    key: "medical_summary",
-    modelId: "anthropic/claude-opus-5.5",
-    temperature: 0.2,
-    maxTokens: 8000,
-  },
+  fast: { key: "fast", modelId: "anthropic/claude-haiku-5.5", maxTokens: 4000 },
+  vision: { key: "vision", modelId: "google/gemini-3.8-flash", maxTokens: 4000 },
+  asr: { key: "asr", modelId: "openai/whisper-large-v3", maxTokens: null },
+  reasoning: { key: "reasoning", modelId: "anthropic/claude-sonnet-5.5", maxTokens: 8000 },
+  medical_summary: { key: "medical_summary", modelId: "anthropic/claude-opus-5.5", maxTokens: 8000 },
 };
 
 type Capability = "text" | "image" | "transcription";
@@ -40,7 +37,7 @@ export function validateModelChoice(
   key: ModelProfileKey,
   modelId: string,
   models: Map<string, ModelInfo>,
-  zdrModelIds: Set<string>,
+  zdrEndpointParams: Map<string, Set<string>>,
 ): string | null {
   const model = models.get(modelId);
   if (!model) return "OpenRouter 上找不到這個模型 ID";
@@ -58,8 +55,13 @@ export function validateModelChoice(
   if (capability !== "transcription" && !model.outputModalities.includes("text")) {
     return "這個模型不會輸出文字";
   }
-  if (!zdrModelIds.has(modelId)) {
+  const zdrParams = zdrEndpointParams.get(modelId);
+  if (!zdrParams) {
     return "這個模型沒有零資料保留（ZDR）端點，基於隱私無法使用";
+  }
+  // 結構化輸出（JSON Schema）以 require_parameters 要求，ZDR 端點必須支援
+  if (capability !== "transcription" && !zdrParams.has("response_format")) {
+    return "這個模型的零資料保留（ZDR）端點不支援結構化輸出，無法用於這個用途";
   }
   return null;
 }
