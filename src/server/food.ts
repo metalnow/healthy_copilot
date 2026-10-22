@@ -244,3 +244,57 @@ export async function deleteDrinkEvent(db: Db, userId: string, id: string) {
     .returning({ id: drinkEvents.id });
   return deleted.length > 0;
 }
+
+export async function getDrinkEvent(db: Db, userId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(drinkEvents)
+    .where(and(eq(drinkEvents.id, id), eq(drinkEvents.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** 由酒精克數反推酒精濃度，供修改表單預填 */
+export function abvFromAlcohol(alcoholG: number | null, volumeMl: number | null) {
+  if (!alcoholG || !volumeMl) return undefined;
+  return Math.round((alcoholG / (volumeMl * ETHANOL_DENSITY)) * 1000) / 10;
+}
+
+/**
+ * 修改飲料。類型不變時，咖啡因、糖、熱量等估算值依容量等比例調整；類型改變則清除。
+ */
+export async function updateDrinkEvent(
+  db: Db,
+  user: SessionUser,
+  id: string,
+  input: { drinkType: DrinkType; name?: string; occurredAt: Date; volumeMl: number; abvPercent?: number },
+) {
+  const existing = await getDrinkEvent(db, user.id, id);
+  if (!existing) return false;
+  const sameType = existing.drinkType === input.drinkType;
+  const ratio = sameType && existing.volumeMl ? input.volumeMl / existing.volumeMl : null;
+  const scale = (n: number | null | undefined) => (ratio !== null && n != null ? Math.round(n * ratio * 10) / 10 : null);
+  const kcal = scale(existing.nutrition?.kcal);
+
+  await db
+    .update(drinkEvents)
+    .set({
+      drinkType: input.drinkType,
+      name: input.name ?? null,
+      ...eventTimeFields(input.occurredAt, user.timezone),
+      volumeMl: input.volumeMl,
+      waterMl: input.drinkType === "water" ? input.volumeMl : null,
+      caffeineMg: scale(existing.caffeineMg),
+      sugarG: scale(existing.sugarG),
+      alcoholG:
+        input.drinkType !== "alcohol"
+          ? null
+          : input.abvPercent !== undefined
+            ? alcoholGrams(input.volumeMl, input.abvPercent)
+            : scale(existing.alcoholG),
+      nutrition: kcal !== null ? { ...existing.nutrition!, kcal } : null,
+      verifiedByUser: true,
+    })
+    .where(and(eq(drinkEvents.id, id), eq(drinkEvents.userId, user.id)));
+  return true;
+}

@@ -1,6 +1,7 @@
 "use server";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDb } from "@/db";
@@ -14,9 +15,26 @@ import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import { minutesBetween } from "@/lib/sleep";
 import { toLocalDate } from "@/lib/time";
 import { getExtraction, settleExtraction } from "@/server/ai/extractions";
-import { addExercise, addSleep, addSymptom, upsertActivity } from "@/server/lifestyle";
+import {
+  addExercise,
+  addSleep,
+  addSymptom,
+  updateActivity,
+  updateExercise,
+  updateSleep,
+  updateSymptom,
+  upsertActivity,
+} from "@/server/lifestyle";
 
 type Errors = Record<string, string>;
+
+/** 修改完成：記錄稽核並回到首頁 */
+async function finishUpdate(db: Awaited<ReturnType<typeof getDb>>, userId: string, action: string, id: string, ok: boolean) {
+  if (!ok) return { error: "找不到這筆紀錄" } satisfies ActionState;
+  await recordAudit(db, { userId, action, entityId: id });
+  revalidatePath("/timeline");
+  redirect("/");
+}
 
 /** 選填數值：空白為 undefined，超出範圍記錄錯誤 */
 function optionalInRange(
@@ -37,7 +55,7 @@ function optionalInRange(
   return value;
 }
 
-export async function saveSleep(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveSleep(sleepId: string | null, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   const now = new Date();
   const errors: Errors = {};
@@ -77,6 +95,10 @@ export async function saveSleep(_prev: ActionState, formData: FormData): Promise
   if (Object.keys(errors).length > 0 || !wakeAt) return { fieldErrors: errors };
 
   const db = await getDb();
+  if (sleepId) {
+    const values = { bedtimeAt, sleepStartAt, wakeAt, quality, awakenings, totalSleepMin, awakeMin, deepMin, remMin, lightMin, avgHeartRate, hrvMs };
+    return finishUpdate(db, user.id, "sleep.update", sleepId, await updateSleep(db, user, sleepId, values));
+  }
   // 從截圖匯入：以伺服器端的擷取紀錄為準，不採用前端傳來的媒體 id
   const extractionId = formString(formData, "extractionId");
   let screenshot: { originalImageId?: string; confidence?: number; extractionId: string } | undefined;
@@ -111,7 +133,11 @@ export async function saveSleep(_prev: ActionState, formData: FormData): Promise
   redirect("/");
 }
 
-export async function saveActivity(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveActivity(
+  activityId: string | null,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireUser();
   const errors: Errors = {};
   const today = toLocalDate(new Date(), user.timezone);
@@ -127,18 +153,21 @@ export async function saveActivity(_prev: ActionState, formData: FormData): Prom
   if (Object.keys(errors).length > 0 || !localDate) return { fieldErrors: errors };
 
   const db = await getDb();
-  const id = await upsertActivity(db, user.id, {
-    localDate,
-    steps,
-    distanceM: distanceKm !== undefined ? Math.round(distanceKm * 1000) : undefined,
-    activeMinutes,
-    source: "manual",
-  });
+  const distanceM = distanceKm !== undefined ? Math.round(distanceKm * 1000) : undefined;
+  if (activityId) {
+    const ok = await updateActivity(db, user.id, activityId, { steps, distanceM, activeMinutes });
+    return finishUpdate(db, user.id, "activity.update", activityId, ok);
+  }
+  const id = await upsertActivity(db, user.id, { localDate, steps, distanceM, activeMinutes, source: "manual" });
   await recordAudit(db, { userId: user.id, action: "activity.upsert", entityId: id });
   redirect("/");
 }
 
-export async function saveExercise(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveExercise(
+  exerciseId: string | null,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireUser();
   const errors: Errors = {};
   const type = z.enum(EXERCISE_TYPES).safeParse(formString(formData, "type"));
@@ -156,7 +185,7 @@ export async function saveExercise(_prev: ActionState, formData: FormData): Prom
   }
 
   const db = await getDb();
-  const id = await addExercise(db, user, {
+  const values = {
     type: type.data,
     startedAt: time.occurredAt,
     durationMin,
@@ -164,12 +193,20 @@ export async function saveExercise(_prev: ActionState, formData: FormData): Prom
     rpe,
     afterMeal: formData.get("afterMeal") === "on",
     note,
-  });
+  };
+  if (exerciseId) {
+    return finishUpdate(db, user.id, "exercise.update", exerciseId, await updateExercise(db, user, exerciseId, values));
+  }
+  const id = await addExercise(db, user, values);
   await recordAudit(db, { userId: user.id, action: "exercise.create", entityId: id });
   redirect("/");
 }
 
-export async function saveSymptom(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveSymptom(
+  symptomId: string | null,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireUser();
   const errors: Errors = {};
   const type = z.enum(SYMPTOM_TYPES).safeParse(formString(formData, "type"));
@@ -194,14 +231,18 @@ export async function saveSymptom(_prev: ActionState, formData: FormData): Promi
           .where(and(eq(foodEvents.userId, user.id), inArray(foodEvents.id, requestedFoodIds)))
       ).map((r) => r.id)
     : [];
-  const id = await addSymptom(db, user, {
+  const values = {
     type: type.data,
     occurredAt: time.occurredAt,
     severity,
     durationMin,
     note: formString(formData, "note")?.slice(0, 2000),
     relatedFoodEventIds: ownedFoodIds,
-  });
+  };
+  if (symptomId) {
+    return finishUpdate(db, user.id, "symptom.update", symptomId, await updateSymptom(db, user, symptomId, values));
+  }
+  const id = await addSymptom(db, user, values);
   await recordAudit(db, { userId: user.id, action: "symptom.create", entityId: id });
   redirect("/");
 }

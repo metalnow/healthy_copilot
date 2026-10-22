@@ -39,7 +39,7 @@ export default async function MeasurementPage({ params }: PageProps<"/log/measur
       )}
       <MeasurementForm
         type={type}
-        action={saveMeasurement.bind(null, type)}
+        action={saveMeasurement.bind(null, type, null)}
         defaultOccurredAt={toDateTimeLocalValue(new Date(), user.timezone)}
       />
     </div>

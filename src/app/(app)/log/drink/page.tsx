@@ -12,7 +12,7 @@ export default async function DrinkPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="記錄飲料 / 飲水" />
-      <DrinkForm action={saveDrink} defaultOccurredAt={toDateTimeLocalValue(new Date(), user.timezone)} />
+      <DrinkForm action={saveDrink.bind(null, null)} defaultOccurredAt={toDateTimeLocalValue(new Date(), user.timezone)} />
     </div>
   );
 }

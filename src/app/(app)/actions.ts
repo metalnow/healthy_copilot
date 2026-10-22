@@ -20,18 +20,25 @@ import {
   deleteDrinkEvent,
   deleteFoodEvent,
   lastMealItems,
+  updateDrinkEvent,
   updateFoodEvent,
   type FoodItemDraft,
 } from "@/server/food";
 import { clearMedicationEvent, recordMedicationEvent } from "@/server/medications";
 import { deleteLifestyleEntry } from "@/server/lifestyle";
-import { addObservation, deleteObservation } from "@/server/observations";
+import {
+  addObservation,
+  deleteObservation,
+  findPulseObservation,
+  updateObservation,
+} from "@/server/observations";
 import { DELETABLE_KINDS, type DeletableKind } from "@/server/timeline";
 
 // 所有 action 都可能被直接 POST 呼叫：一律先 requireUser()，資料操作以 user.id 限定。
 
 export async function saveMeasurement(
   type: ObservationType,
+  observationId: string | null,
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -43,6 +50,38 @@ export async function saveMeasurement(
 
   const db = await getDb();
   const { values, occurredAt, note, context } = parsed.data;
+
+  if (observationId) {
+    const updated = await updateObservation(db, user, observationId, {
+      values,
+      occurredAt,
+      note,
+      // 只有血壓的情境來自表單；其他類型保留原本的 context
+      context: type === "blood_pressure" ? (context ?? null) : undefined,
+    });
+    if (!updated) return { error: "找不到這筆紀錄" };
+    await recordAudit(db, { userId: user.id, action: "observation.update", entityType: type, entityId: observationId });
+
+    // 同步血壓附帶的心率：有脈搏就更新或補建，拿掉脈搏就刪除
+    if (type === "blood_pressure") {
+      const pulseId = await findPulseObservation(db, user.id, observationId);
+      if (values.pulse !== undefined && pulseId) {
+        await updateObservation(db, user, pulseId, { values: { bpm: values.pulse }, occurredAt });
+      } else if (values.pulse !== undefined) {
+        await addObservation(db, user, {
+          type: "heart_rate",
+          values: { bpm: values.pulse },
+          occurredAt,
+          context: { fromBloodPressure: observationId },
+        });
+      } else if (pulseId) {
+        await deleteObservation(db, user.id, pulseId);
+      }
+    }
+    revalidatePath("/timeline");
+    redirect("/");
+  }
+
   const id = await addObservation(db, user, { type, values, occurredAt, note, context });
   await recordAudit(db, { userId: user.id, action: "observation.create", entityType: type, entityId: id });
 
@@ -141,7 +180,11 @@ export async function getLastMeal(mealType: MealType): Promise<FoodItemDraft[]> 
   return lastMealItems(await getDb(), user.id, mealType);
 }
 
-export async function saveDrink(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveDrink(
+  drinkEventId: string | null,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireUser();
 
   const drinkType = z.enum(DRINK_TYPES).safeParse(formString(formData, "drinkType"));
@@ -162,14 +205,21 @@ export async function saveDrink(_prev: ActionState, formData: FormData): Promise
   }
 
   const db = await getDb();
-  const id = await addDrinkEvent(db, user, {
+  const values = {
     drinkType: drinkType.data,
-    name,
+    name: drinkType.data === "water" ? undefined : name,
     occurredAt: time.occurredAt,
     volumeMl: volumeMl.data,
     abvPercent: abvPercent.success ? abvPercent.data : undefined,
-  });
-  await recordAudit(db, { userId: user.id, action: "drink_event.create", entityId: id });
+  };
+  if (drinkEventId) {
+    if (!(await updateDrinkEvent(db, user, drinkEventId, values))) return { error: "找不到這筆紀錄" };
+    await recordAudit(db, { userId: user.id, action: "drink_event.update", entityId: drinkEventId });
+    revalidatePath("/timeline");
+  } else {
+    const id = await addDrinkEvent(db, user, values);
+    await recordAudit(db, { userId: user.id, action: "drink_event.create", entityId: id });
+  }
   redirect("/");
 }
 

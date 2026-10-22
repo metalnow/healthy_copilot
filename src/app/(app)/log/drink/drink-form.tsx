@@ -22,14 +22,16 @@ const ABV_PRESETS = [
 type Props = {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   defaultOccurredAt: string;
+  /** 修改既有紀錄時的數值 */
+  defaults?: { drinkType: DrinkType; name?: string; volumeMl?: number; abvPercent?: number };
 };
 
-export function DrinkForm({ action, defaultOccurredAt }: Props) {
+export function DrinkForm({ action, defaultOccurredAt, defaults }: Props) {
   const [state, formAction] = useActionState(action, {});
   const errors = state.fieldErrors ?? {};
-  const [drinkType, setDrinkType] = useState<DrinkType>("water");
-  const [volume, setVolume] = useState("250");
-  const [abv, setAbv] = useState("");
+  const [drinkType, setDrinkType] = useState<DrinkType>(defaults?.drinkType ?? "water");
+  const [volume, setVolume] = useState(String(defaults?.volumeMl ?? 250));
+  const [abv, setAbv] = useState(defaults?.abvPercent !== undefined ? String(defaults.abvPercent) : "");
 
   return (
     <form action={formAction} className="space-y-5">
@@ -47,7 +49,7 @@ export function DrinkForm({ action, defaultOccurredAt }: Props) {
 
       {drinkType !== "water" && (
         <Field label="名稱（選填）" htmlFor="name" error={errors.name} hint="例如 無糖拿鐵、珍珠奶茶半糖">
-          <input id="name" name="name" maxLength={100} className={inputClass} />
+          <input id="name" name="name" defaultValue={defaults?.name} maxLength={100} className={inputClass} />
         </Field>
       )}
 

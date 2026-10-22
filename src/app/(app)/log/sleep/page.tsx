@@ -21,7 +21,7 @@ export default async function SleepPage() {
     <div className="space-y-6">
       <PageHeader title="記錄睡眠" />
       <SleepForm
-        action={saveSleep}
+        action={saveSleep.bind(null, null)}
         aiConfigured={Boolean((await getEnv()).OPENROUTER_API_KEY)}
         defaults={{ bedtimeAt: `${yesterday}T23:00`, wakeAt: toDateTimeLocalValue(wake, user.timezone) }}
       />

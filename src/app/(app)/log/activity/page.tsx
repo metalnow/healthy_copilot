@@ -12,7 +12,7 @@ export default async function ActivityPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="記錄步數 / 活動量" />
-      <ActivityForm action={saveActivity} today={toLocalDate(new Date(), user.timezone)} />
+      <ActivityForm action={saveActivity.bind(null, null)} today={toLocalDate(new Date(), user.timezone)} />
     </div>
   );
 }

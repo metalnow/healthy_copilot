@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { observations } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
@@ -77,4 +77,50 @@ export async function deleteObservation(db: Db, userId: string, id: string) {
     .where(and(eq(observations.id, id), eq(observations.userId, userId)))
     .returning({ id: observations.id });
   return deleted.length > 0;
+}
+
+export async function getObservation(db: Db, userId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(observations)
+    .where(and(eq(observations.id, id), eq(observations.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** 修改數值、時間與備註；context 只在有傳入時覆寫（保留心率與血壓的關聯） */
+export async function updateObservation(
+  db: Db,
+  user: SessionUser,
+  id: string,
+  input: { values: Record<string, number>; occurredAt: Date; note?: string; context?: Record<string, unknown> | null },
+) {
+  const updated = await db
+    .update(observations)
+    .set({
+      values: input.values,
+      ...eventTimeFields(input.occurredAt, user.timezone),
+      note: input.note ?? null,
+      ...(input.context !== undefined && { context: input.context }),
+      verifiedByUser: true,
+    })
+    .where(and(eq(observations.id, id), eq(observations.userId, user.id)))
+    .returning({ id: observations.id });
+  return updated.length > 0;
+}
+
+/** 由血壓的脈搏自動建立的心率紀錄 */
+export async function findPulseObservation(db: Db, userId: string, bloodPressureId: string) {
+  const [row] = await db
+    .select({ id: observations.id })
+    .from(observations)
+    .where(
+      and(
+        eq(observations.userId, userId),
+        eq(observations.type, "heart_rate"),
+        sql`json_extract(${observations.context}, '$.fromBloodPressure') = ${bloodPressureId}`,
+      ),
+    )
+    .limit(1);
+  return row?.id ?? null;
 }

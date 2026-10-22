@@ -12,10 +12,13 @@ export function SymptomForm({
   action,
   defaultOccurredAt,
   recentFood,
+  defaults,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   defaultOccurredAt: string;
   recentFood: { id: string; label: string }[];
+  /** 修改既有紀錄時的數值 */
+  defaults?: { type: string; severity: number; durationMin?: number; note?: string; relatedFoodEventIds: string[] };
 }) {
   const [state, formAction] = useActionState(action, {});
   const errors = state.fieldErrors ?? {};
@@ -26,6 +29,7 @@ export function SymptomForm({
         <ChipGroup
           name="type"
           label="症狀"
+          defaultValue={defaults?.type}
           options={SYMPTOM_TYPES.filter((t) => !LIFE_EVENTS.has(t) && t !== "other").map((t) => ({
             value: t,
             label: SYMPTOM_LABELS[t],
@@ -36,6 +40,7 @@ export function SymptomForm({
         <ChipGroup
           name="type"
           label="生活事件"
+          defaultValue={defaults?.type}
           options={[...LIFE_EVENT_TYPES, "other" as const].map((t) => ({ value: t, label: SYMPTOM_LABELS[t] }))}
         />
       </Field>
@@ -43,7 +48,7 @@ export function SymptomForm({
         <ChipGroup
           name="severity"
           label="嚴重度"
-          defaultValue="2"
+          defaultValue={String(defaults?.severity ?? 2)}
           options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} ${SEVERITY_LABELS[n]}` }))}
         />
       </Field>
@@ -52,18 +57,24 @@ export function SymptomForm({
           <input id="occurredAt" name="occurredAt" type="datetime-local" defaultValue={defaultOccurredAt} className={inputClass} />
         </Field>
         <Field label="持續（分鐘，選填）" htmlFor="durationMin" error={errors.durationMin}>
-          <input id="durationMin" name="durationMin" type="number" inputMode="numeric" className={inputClass} />
+          <input id="durationMin" name="durationMin" type="number" inputMode="numeric" defaultValue={defaults?.durationMin} className={inputClass} />
         </Field>
       </div>
       <Field label="描述（選填）" htmlFor="note">
-        <textarea id="note" name="note" rows={2} maxLength={2000} className={inputClass} />
+        <textarea id="note" name="note" rows={2} maxLength={2000} defaultValue={defaults?.note} className={inputClass} />
       </Field>
       {recentFood.length > 0 && (
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">可能相關的飲食（選填）</legend>
           {recentFood.map((food) => (
             <label key={food.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="relatedFoodEventIds" value={food.id} className="size-4 accent-accent" />
+              <input
+                type="checkbox"
+                name="relatedFoodEventIds"
+                value={food.id}
+                defaultChecked={defaults?.relatedFoodEventIds.includes(food.id)}
+                className="size-4 accent-accent"
+              />
               {food.label}
             </label>
           ))}

@@ -9,6 +9,12 @@ type Props = {
   type: ObservationType;
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   defaultOccurredAt: string;
+  /** 修改既有紀錄時的數值 */
+  defaults?: {
+    values: Record<string, number | string>;
+    note?: string;
+    context?: { position?: string; arm?: string; afterRestMinutes?: number; beforeBreakfast?: boolean };
+  };
 };
 
 function NumberInput({
@@ -17,12 +23,14 @@ function NumberInput({
   step = "1",
   placeholder,
   autoFocus,
+  defaultValue,
 }: {
   name: string;
   error?: string;
   step?: string;
   placeholder?: string;
   autoFocus?: boolean;
+  defaultValue?: number | string;
 }) {
   return (
     <input
@@ -33,15 +41,18 @@ function NumberInput({
       step={step}
       placeholder={placeholder}
       autoFocus={autoFocus}
+      defaultValue={defaultValue}
       aria-invalid={error ? true : undefined}
       className={inputClass}
     />
   );
 }
 
-export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
+export function MeasurementForm({ type, action, defaultOccurredAt, defaults }: Props) {
   const [state, formAction] = useActionState(action, {});
   const errors = state.fieldErrors ?? {};
+  const value = (key: string) => defaults?.values[key];
+  const context = defaults?.context;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -49,19 +60,19 @@ export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
 
       {type === "weight" && (
         <Field label="體重（kg）" htmlFor="weight" error={errors.weight}>
-          <NumberInput name="weight" step="0.1" placeholder="例如 72.5" error={errors.weight} autoFocus />
+          <NumberInput name="weight" step="0.1" placeholder="例如 72.5" error={errors.weight} defaultValue={value("weight")} autoFocus />
         </Field>
       )}
 
       {type === "waist" && (
         <Field label="腰圍（cm）" htmlFor="waist" error={errors.waist} hint="站立、吐氣後，於肚臍上緣水平量測">
-          <NumberInput name="waist" step="0.1" placeholder="例如 88" error={errors.waist} autoFocus />
+          <NumberInput name="waist" step="0.1" placeholder="例如 88" error={errors.waist} defaultValue={value("waist")} autoFocus />
         </Field>
       )}
 
       {type === "heart_rate" && (
         <Field label="心率（bpm）" htmlFor="bpm" error={errors.bpm} hint="靜止休息 5 分鐘後量測">
-          <NumberInput name="bpm" placeholder="例如 68" error={errors.bpm} autoFocus />
+          <NumberInput name="bpm" placeholder="例如 68" error={errors.bpm} defaultValue={value("bpm")} autoFocus />
         </Field>
       )}
 
@@ -69,14 +80,14 @@ export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
         <>
           <div className="grid grid-cols-2 gap-3">
             <Field label="收縮壓（上）" htmlFor="systolic" error={errors.systolic}>
-              <NumberInput name="systolic" placeholder="120" error={errors.systolic} autoFocus />
+              <NumberInput name="systolic" placeholder="120" error={errors.systolic} defaultValue={value("systolic")} autoFocus />
             </Field>
             <Field label="舒張壓（下）" htmlFor="diastolic" error={errors.diastolic}>
-              <NumberInput name="diastolic" placeholder="80" error={errors.diastolic} />
+              <NumberInput name="diastolic" placeholder="80" error={errors.diastolic} defaultValue={value("diastolic")} />
             </Field>
           </div>
           <Field label="脈搏（選填）" htmlFor="pulse" error={errors.pulse} hint="會同時記錄為一筆心率">
-            <NumberInput name="pulse" placeholder="70" error={errors.pulse} />
+            <NumberInput name="pulse" placeholder="70" error={errors.pulse} defaultValue={value("pulse")} />
           </Field>
 
           <details className="rounded-lg border border-border p-3">
@@ -86,7 +97,7 @@ export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
                 <ChipGroup
                   name="position"
                   label="姿勢"
-                  defaultValue="sitting"
+                  defaultValue={defaults ? context?.position : "sitting"}
                   options={[
                     { value: "sitting", label: "坐姿" },
                     { value: "standing", label: "站姿" },
@@ -98,6 +109,7 @@ export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
                 <ChipGroup
                   name="arm"
                   label="手臂"
+                  defaultValue={context?.arm}
                   options={[
                     { value: "left", label: "左手" },
                     { value: "right", label: "右手" },
@@ -111,12 +123,17 @@ export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  defaultValue={5}
+                  defaultValue={defaults ? context?.afterRestMinutes : 5}
                   className={inputClass}
                 />
               </Field>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="beforeBreakfast" className="size-4 accent-accent" />
+                <input
+                  type="checkbox"
+                  name="beforeBreakfast"
+                  defaultChecked={context?.beforeBreakfast}
+                  className="size-4 accent-accent"
+                />
                 早餐前量測
               </label>
               {errors.context && <p className="text-sm text-warning">{errors.context}</p>}
@@ -137,7 +154,7 @@ export function MeasurementForm({ type, action, defaultOccurredAt }: Props) {
       </Field>
 
       <Field label="備註（選填）" htmlFor="note" error={errors.note}>
-        <input id="note" name="note" maxLength={2000} className={inputClass} />
+        <input id="note" name="note" defaultValue={defaults?.note} maxLength={2000} className={inputClass} />
       </Field>
 
       <SubmitButton>儲存</SubmitButton>

@@ -10,7 +10,15 @@ import { resizeImage } from "../ai/image";
 
 type Props = {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
-  defaults: { bedtimeAt: string; wakeAt: string };
+  defaults: {
+    bedtimeAt: string;
+    wakeAt: string;
+    /** 修改既有紀錄時的其他欄位 */
+    sleepStartAt?: string;
+    awakenings?: number;
+    quality?: number;
+    details?: SleepDraft;
+  };
   aiConfigured: boolean;
 };
 
@@ -27,11 +35,15 @@ const DETAIL_FIELDS: { key: keyof SleepDraft; label: string }[] = [
 export function SleepForm({ action, defaults, aiConfigured }: Props) {
   const [state, formAction] = useActionState(action, {});
   const errors = state.fieldErrors ?? {};
-  const [values, setValues] = useState<Record<string, string>>({
+  const [values, setValues] = useState<Record<string, string>>(() => ({
     bedtimeAt: defaults.bedtimeAt,
-    sleepStartAt: "",
+    sleepStartAt: defaults.sleepStartAt ?? "",
     wakeAt: defaults.wakeAt,
-  });
+    ...Object.fromEntries(
+      Object.entries(defaults.details ?? {}).flatMap(([k, v]) => (v !== undefined ? [[k, String(v)]] : [])),
+    ),
+  }));
+  const hasDetails = Object.values(defaults.details ?? {}).some((v) => v !== undefined);
   const [imported, setImported] = useState<{ extractionId: string; confidence?: number; notes?: string }>();
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string>();
@@ -104,7 +116,7 @@ export function SleepForm({ action, defaults, aiConfigured }: Props) {
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="夜間醒來次數" htmlFor="awakenings" error={errors.awakenings}>
-          <input id="awakenings" name="awakenings" type="number" inputMode="numeric" min={0} className={inputClass} />
+          <input id="awakenings" name="awakenings" type="number" inputMode="numeric" min={0} defaultValue={defaults.awakenings} className={inputClass} />
         </Field>
       </div>
 
@@ -112,11 +124,12 @@ export function SleepForm({ action, defaults, aiConfigured }: Props) {
         <ChipGroup
           name="quality"
           label="睡眠品質"
+          defaultValue={defaults.quality !== undefined ? String(defaults.quality) : undefined}
           options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} ${SLEEP_QUALITY_LABELS[n]}` }))}
         />
       </Field>
 
-      <details className="rounded-lg border border-border p-3" open={Boolean(imported)}>
+      <details className="rounded-lg border border-border p-3" open={Boolean(imported) || hasDetails}>
         <summary className="cursor-pointer text-sm font-medium">睡眠階段與心率（選填）</summary>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {DETAIL_FIELDS.map((field) => (

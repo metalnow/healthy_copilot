@@ -26,7 +26,7 @@ export default async function SymptomPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="記錄症狀 / 事件" />
-      <SymptomForm action={saveSymptom} defaultOccurredAt={toDateTimeLocalValue(now, user.timezone)} recentFood={recentFood} />
+      <SymptomForm action={saveSymptom.bind(null, null)} defaultOccurredAt={toDateTimeLocalValue(now, user.timezone)} recentFood={recentFood} />
     </div>
   );
 }
