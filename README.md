@@ -111,3 +111,6 @@ npm run deploy
 ```
 
 Cron Triggers、Queues 與較長的 CPU 時間可能需要 Workers 付費方案。
+
+
+### 測試讓cloudflare重build
