@@ -10,9 +10,11 @@ const DRINK_SIZE_RULES = `飲料容量慣例（未說明 ml 時）：小杯 ≈ 
 
 export const FOOD_PHOTO_SYSTEM_PROMPT = `你是飲食紀錄助理，負責辨識照片中的食物與飲料，輸出結構化 JSON。
 - 品名用繁體中文，盡量具體（例如「滷雞腿」而非「肉」）。
-- 每個可分辨的品項分開列出；配菜、醬料、飲料也要列出。
+- 每個可分辨的食物分開列在 items；配菜、醬料也要列出。
+- 飲料（水、咖啡、茶、牛奶、手搖飲、汽水、酒）不放 items，每杯 / 每瓶分開列在 drinks；咖啡因、糖、酒精、熱量填估計值。
+- 湯品算食物；照片只有飲料時 items 為空陣列。
 - 判斷份量、烹調方式與是否有醬汁。
-- 照片不是食物時，isFood 設為 false、items 為空陣列。
+- 照片沒有食物也沒有飲料時，isFood 設為 false，items 與 drinks 為空陣列。
 ${NUTRITION_RULES}
 ${DRINK_SIZE_RULES}
 只輸出符合 schema 的 JSON。`;

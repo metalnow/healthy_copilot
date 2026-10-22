@@ -38,10 +38,23 @@ export const AiFoodItemSchema = z.strictObject({
 });
 export type AiFoodItem = z.infer<typeof AiFoodItemSchema>;
 
+export const AiDrinkItemSchema = z.strictObject({
+  drinkType: z.enum(DRINK_TYPES),
+  name: z.string().nullable().describe("飲料名稱，例如 珍珠奶茶、美式咖啡"),
+  volumeMl: num.describe("容量 ml"),
+  caffeineMg: num.describe("估計的咖啡因 mg"),
+  sugarG: num.describe("估計的糖 g"),
+  alcoholG: num.describe("估計的酒精 g"),
+  kcal: num.describe("估計的熱量 kcal"),
+  confidence: z.number().describe("對此飲料辨識的信心 0–1"),
+});
+export type AiDrinkItem = z.infer<typeof AiDrinkItemSchema>;
+
 export const FoodPhotoResultSchema = z.strictObject({
   isFood: z.boolean().describe("照片中是否有食物或飲料"),
   mealType: z.enum(MEAL_TYPES).nullable().describe("依內容推測的餐別，無法判斷填 null"),
-  items: z.array(AiFoodItemSchema),
+  items: z.array(AiFoodItemSchema).describe("食物品項，不含飲料"),
+  drinks: z.array(AiDrinkItemSchema).describe("飲料，每杯 / 每瓶一筆"),
   overallConfidence: z.number().describe("整體信心 0–1"),
   notes: z.string().nullable().describe("給使用者的簡短補充，例如看不清楚的部分"),
 });

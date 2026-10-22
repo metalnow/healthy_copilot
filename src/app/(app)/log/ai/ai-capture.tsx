@@ -133,8 +133,8 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
         <div className="space-y-3">
           <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface px-4 py-10 text-center">
             <span className="text-3xl">📷</span>
-            <span className="font-medium">拍攝或選擇餐點照片</span>
-            <span className="text-xs text-muted">AI 會辨識食物、份量並估算營養</span>
+            <span className="font-medium">拍攝或選擇餐點、飲料照片</span>
+            <span className="text-xs text-muted">AI 會分開辨識食物與飲料，並估算份量與營養</span>
             <input
               ref={fileRef}
               type="file"

@@ -22,7 +22,7 @@ import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { formatMl, formatObservation, formatShortDate } from "@/lib/format";
-import { OBSERVATION_LABELS } from "@/lib/labels";
+import { DRINK_TYPE_LABELS, OBSERVATION_LABELS } from "@/lib/labels";
 import { countDone } from "@/lib/medication/checklist";
 import {
   evaluateBloodPressure,
@@ -51,7 +51,7 @@ import { MedicationChecklist } from "./_components/medication-checklist";
 import { SafetyBanner } from "./_components/safety-banner";
 
 const AI_MODES: { mode: string; label: string; icon: LucideIcon }[] = [
-  { mode: "photo", label: "拍餐點", icon: Camera },
+  { mode: "photo", label: "拍照", icon: Camera },
   { mode: "voice", label: "說一句", icon: Mic },
   { mode: "text", label: "打一句", icon: Keyboard },
 ];
@@ -174,7 +174,14 @@ export default async function TodayPage() {
   const focus = reviewOutput?.success ? reviewOutput.data.nextFocus.slice(0, 3) : [];
 
   const waterMl = drinks.reduce((sum, d) => sum + (d.waterMl ?? 0), 0);
-  const otherDrinks = drinks.filter((d) => d.drinkType !== "water").length;
+  // 水以外的飲料依類型計數，例如「咖啡 1・含糖飲料 2」
+  const otherDrinkCounts = new Map<string, number>();
+  for (const d of drinks) {
+    if (d.drinkType === "water") continue;
+    const label = DRINK_TYPE_LABELS[d.drinkType];
+    otherDrinkCounts.set(label, (otherDrinkCounts.get(label) ?? 0) + 1);
+  }
+  const otherDrinks = [...otherDrinkCounts].map(([label, n]) => `${label} ${n}`).join("・");
   const medsDone = countDone(checklist);
   const steps = Math.max(0, ...lifestyle.activity.map((a) => a.steps ?? 0));
   const lastNight = lifestyle.sleep[0];
@@ -243,11 +250,11 @@ export default async function TodayPage() {
           <Tile label="睡眠" icon={Moon} href="/log/sleep" value={lastNight ? formatDuration(sleepMin) : undefined} />
           <Tile label="飲食" icon={Utensils} href="/log/food" value={food.length > 0 ? `${food.length} 筆` : undefined} />
           <Tile
-            label="飲水"
+            label="飲料"
             icon={GlassWater}
             href="/log/drink"
-            value={drinks.length > 0 ? formatMl(waterMl) : undefined}
-            sub={otherDrinks > 0 ? `其他飲料 ${otherDrinks} 杯` : undefined}
+            value={waterMl > 0 ? `水 ${formatMl(waterMl)}` : drinks.length > 0 ? `${drinks.length} 杯` : undefined}
+            sub={otherDrinks || undefined}
           />
           <Tile
             label="運動"

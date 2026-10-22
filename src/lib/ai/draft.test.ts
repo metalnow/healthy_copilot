@@ -6,7 +6,7 @@ import {
   resolveOccurredAt,
   sumNutrition,
 } from "./draft";
-import type { AiEvent, AiFoodItem } from "./schemas";
+import type { AiDrinkItem, AiEvent, AiFoodItem } from "./schemas";
 
 const TZ = "Asia/Taipei";
 const now = new Date("2026-10-21T08:00:00Z"); // 台北 16:00
@@ -169,18 +169,61 @@ describe("draftFromTextParse：運動與症狀", () => {
 describe("draftFromFoodPhoto", () => {
   it("非食物照片回傳空陣列", () => {
     expect(
-      draftFromFoodPhoto({ isFood: false, mealType: null, items: [], overallConfidence: 0.9, notes: null }, now, TZ),
+      draftFromFoodPhoto({ isFood: false, mealType: null, items: [], drinks: [], overallConfidence: 0.9, notes: null }, now, TZ),
     ).toEqual([]);
   });
 
   it("照片轉成一筆飲食草稿", () => {
     const [draft] = draftFromFoodPhoto(
-      { isFood: true, mealType: "lunch", items: [item("滷雞腿", 300), item("  ")], overallConfidence: 1.2, notes: null },
+      { isFood: true, mealType: "lunch", items: [item("滷雞腿", 300), item("  ")], drinks: [], overallConfidence: 1.2, notes: null },
       now,
       TZ,
     );
     expect(draft).toMatchObject({ kind: "food", mealType: "lunch", occurredAt: "2026-10-21T16:00", confidence: 1 });
     expect(draft.kind === "food" && draft.items.map((i) => i.name)).toEqual(["滷雞腿"]);
+  });
+
+  const drink = (overrides: Partial<AiDrinkItem>): AiDrinkItem => ({
+    drinkType: "sugary",
+    name: "珍珠奶茶",
+    volumeMl: 700,
+    caffeineMg: 80,
+    sugarG: 50,
+    alcoholG: null,
+    kcal: 450,
+    confidence: 0.8,
+    ...overrides,
+  });
+
+  it("飲料另外成為飲料草稿", () => {
+    const drafts = draftFromFoodPhoto(
+      { isFood: true, mealType: "lunch", items: [item("排骨便當", 800)], drinks: [drink({})], overallConfidence: 0.9, notes: null },
+      now,
+      TZ,
+    );
+    expect(drafts.map((d) => d.kind)).toEqual(["food", "drink"]);
+    expect(drafts[1]).toEqual({
+      kind: "drink",
+      drinkType: "sugary",
+      name: "珍珠奶茶",
+      volumeMl: 700,
+      caffeineMg: 80,
+      sugarG: 50,
+      alcoholG: undefined,
+      kcal: 450,
+      occurredAt: "2026-10-21T16:00",
+      confidence: 0.8,
+    });
+  });
+
+  it("只有飲料時不產生飲食草稿；容量不明時用預設值並降低信心", () => {
+    const drafts = draftFromFoodPhoto(
+      { isFood: true, mealType: null, items: [], drinks: [drink({ drinkType: "coffee", volumeMl: null })], overallConfidence: 0.9, notes: null },
+      now,
+      TZ,
+    );
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({ kind: "drink", drinkType: "coffee", volumeMl: 250, confidence: 0.5 });
   });
 });
 

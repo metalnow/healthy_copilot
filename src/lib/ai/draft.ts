@@ -4,7 +4,7 @@ import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import { NutritionEstimateSchema, type NutritionEstimate } from "@/lib/schemas/common";
 import { OBSERVATION_TYPES, OBSERVATION_VALUE_SCHEMAS } from "@/lib/schemas/observation";
 import { fromDateTimeLocalValue, toDateTimeLocalValue, toLocalDate } from "@/lib/time";
-import type { AiEvent, AiFoodItem, FoodPhotoResult, TextParseResult } from "./schemas";
+import type { AiDrinkItem, AiEvent, AiFoodItem, FoodPhotoResult, TextParseResult } from "./schemas";
 
 // 「AI 結果 → 可編輯草稿 → 使用者確認」：草稿是使用者實際送出的資料，伺服器再以此 schema 驗證。
 
@@ -180,6 +180,23 @@ function measurementValues(event: AiEvent): Record<string, number> | null {
 const DEFAULT_DRINK_VOLUME_ML = 250;
 const nonNegative = (n: number | null) => (n != null && n >= 0 ? n : undefined);
 
+/** 飲料草稿；容量不明時用預設值並降低信心，提醒使用者確認 */
+function toDraftDrink(drink: AiDrinkItem, occurredAt: string, confidence: number): DraftEvent {
+  const volumeKnown = drink.volumeMl != null && drink.volumeMl > 0;
+  return {
+    kind: "drink",
+    drinkType: drink.drinkType,
+    name: drink.name?.trim().slice(0, 100) || undefined,
+    volumeMl: volumeKnown ? Math.min(5000, Math.round(drink.volumeMl!)) : DEFAULT_DRINK_VOLUME_ML,
+    caffeineMg: nonNegative(drink.caffeineMg),
+    sugarG: nonNegative(drink.sugarG),
+    alcoholG: nonNegative(drink.alcoholG),
+    kcal: nonNegative(drink.kcal),
+    occurredAt,
+    confidence: volumeKnown ? confidence : Math.min(confidence, 0.5),
+  };
+}
+
 export function draftFromTextParse(result: TextParseResult, now: Date, timeZone: string): DraftEvent[] {
   const drafts: DraftEvent[] = [];
   for (const event of result.events) {
@@ -196,19 +213,22 @@ export function draftFromTextParse(result: TextParseResult, now: Date, timeZone:
         confidence,
       });
     } else if (event.kind === "drink") {
-      const volumeKnown = event.volumeMl != null && event.volumeMl > 0;
-      drafts.push({
-        kind: "drink",
-        drinkType: event.drinkType ?? "other",
-        name: event.drinkName?.trim().slice(0, 100) || undefined,
-        volumeMl: volumeKnown ? Math.round(event.volumeMl!) : DEFAULT_DRINK_VOLUME_ML,
-        caffeineMg: nonNegative(event.caffeineMg),
-        sugarG: nonNegative(event.sugarG),
-        alcoholG: nonNegative(event.alcoholG),
-        kcal: nonNegative(event.drinkKcal),
-        occurredAt: resolveOccurredAt(event, now, timeZone),
-        confidence: volumeKnown ? confidence : Math.min(confidence, 0.5),
-      });
+      drafts.push(
+        toDraftDrink(
+          {
+            drinkType: event.drinkType ?? "other",
+            name: event.drinkName,
+            volumeMl: event.volumeMl,
+            caffeineMg: event.caffeineMg,
+            sugarG: event.sugarG,
+            alcoholG: event.alcoholG,
+            kcal: event.drinkKcal,
+            confidence,
+          },
+          resolveOccurredAt(event, now, timeZone),
+          confidence,
+        ),
+      );
     } else if (event.kind === "exercise") {
       const duration = event.durationMin != null && event.durationMin > 0 ? Math.round(event.durationMin) : null;
       if (!duration) continue;
@@ -246,19 +266,26 @@ export function draftFromTextParse(result: TextParseResult, now: Date, timeZone:
   return drafts;
 }
 
+/** 照片 → 一筆飲食（若有食物）+ 每杯飲料各一筆 */
 export function draftFromFoodPhoto(result: FoodPhotoResult, now: Date, timeZone: string): DraftEvent[] {
-  const items = toDraftItems(result.items);
-  if (!result.isFood || items.length === 0) return [];
+  if (!result.isFood) return [];
   const occurredAt = toDateTimeLocalValue(now, timeZone);
-  return [
-    {
+  const confidence = clamp01(result.overallConfidence);
+  const items = toDraftItems(result.items);
+  const drafts: DraftEvent[] = [];
+  if (items.length > 0) {
+    drafts.push({
       kind: "food",
       mealType: result.mealType ?? guessMealType(occurredAt.slice(11)),
       occurredAt,
       items,
-      confidence: clamp01(result.overallConfidence),
-    },
-  ];
+      confidence,
+    });
+  }
+  for (const drink of result.drinks.slice(0, 10)) {
+    drafts.push(toDraftDrink(drink, occurredAt, clamp01(drink.confidence)));
+  }
+  return drafts;
 }
 
 /** 低於此信心值的項目在確認畫面特別標示 */
