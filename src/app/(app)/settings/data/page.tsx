@@ -38,7 +38,7 @@ const BACKUP_MESSAGES: Record<string, { text: string; ok?: boolean }> = {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3 rounded-xl border border-border bg-surface p-4">
-      <h2 className="font-medium">{title}</h2>
+      <h2 className="font-semibold">{title}</h2>
       {children}
     </section>
   );

@@ -46,7 +46,7 @@ export default async function GoalsPage() {
             return (
               <li key={goal.id} className={`space-y-2 rounded-xl border border-border bg-surface p-4 ${goal.status === "paused" ? "opacity-60" : ""}`}>
                 <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="font-medium">{metric?.name ?? goal.metric}</h2>
+                  <h2 className="font-semibold">{metric?.name ?? goal.metric}</h2>
                   <span className="text-xs text-muted">{STATUS_LABELS[goal.status]}</span>
                 </div>
                 <p className="text-sm">
@@ -91,7 +91,7 @@ export default async function GoalsPage() {
       )}
 
       <section className="space-y-3 rounded-xl border border-border bg-surface p-4">
-        <h2 className="font-medium">新增目標</h2>
+        <h2 className="font-semibold">新增目標</h2>
         <GoalForm action={saveGoal} today={toLocalDate(new Date(), user.timezone)} />
       </section>
     </div>

@@ -42,7 +42,7 @@ export function MedicationChecklist({
   return (
     <section aria-labelledby="medication-heading" className="space-y-3">
       <div className="flex items-baseline justify-between">
-        <h2 id="medication-heading" className="font-medium">
+        <h2 id="medication-heading" className="font-semibold">
           今日用藥
         </h2>
         <Link href="/medications" className="text-sm text-accent">

@@ -119,7 +119,7 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">洞察</h1>
+      <h1 className="text-2xl font-bold tracking-tight">洞察</h1>
 
       <nav aria-label="期間" className="flex gap-2">
         {RANGES.map((r) => (
@@ -135,7 +135,7 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
       </nav>
 
       <section className="space-y-3 rounded-xl border border-border bg-surface p-4">
-        <h2 className="font-medium">AI 回顧</h2>
+        <h2 className="font-semibold">AI 回顧</h2>
         {error && <p className="text-sm text-warning">{error}</p>}
         <div className="flex gap-2">
           {(["weekly", "monthly"] as const).map((period) => (
@@ -172,7 +172,7 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
 
       {insights.length > 0 && (
         <section className="space-y-2">
-          <h2 className="font-medium">觀察</h2>
+          <h2 className="font-semibold">觀察</h2>
           <ul className="space-y-2">
             {insights.map((insight) => (
               <li key={insight.id} className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
@@ -185,7 +185,7 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
       )}
 
       <section className="space-y-6 rounded-xl border border-border bg-surface p-4">
-        <h2 className="font-medium">趨勢</h2>
+        <h2 className="font-semibold">趨勢</h2>
         <TrendChart title="體重" unit="kg" series={[{ name: "體重", color: "series-1", points: series.weight }]} />
         <TrendChart
           title="血壓（每日平均）"
@@ -213,7 +213,7 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-medium">
+        <h2 className="font-semibold">
           各面向摘要<span className="ml-2 text-xs font-normal text-muted">與前 {days} 天比較</span>
         </h2>
         <Domains s={current} p={previous} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 export type TrendPoint = { date: string; value: number };
 export type TrendSeries = { name: string; color: "series-1" | "series-2"; points: TrendPoint[] };
@@ -15,7 +15,6 @@ type Props = {
   digits?: number;
 };
 
-const WIDTH = 640;
 const PAD = { top: 16, right: 56, bottom: 28, left: 44 };
 const DAY = 86_400_000;
 
@@ -49,6 +48,16 @@ function shortDate(date: string) {
 export function TrendChart({ title, unit, series, reference, height = 200, digits = 1 }: Props) {
   const id = useId();
   const svgRef = useRef<SVGSVGElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // 以實際寬度作為 viewBox，手機上文字不會跟著縮小
+  const [width, setWidth] = useState(640);
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(280, Math.round(entry.contentRect.width))));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
   const [active, setActive] = useState<number | null>(null);
   const format = (v: number) => v.toLocaleString("zh-TW", { maximumFractionDigits: digits });
 
@@ -67,12 +76,12 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
     const ticks = niceTicks(Math.min(...values), Math.max(...values));
     const yMin = ticks[0];
     const yMax = ticks[ticks.length - 1];
-    const plotW = WIDTH - PAD.left - PAD.right;
+    const plotW = width - PAD.left - PAD.right;
     const plotH = height - PAD.top - PAD.bottom;
     const x = (t: number) => PAD.left + ((t - xMin) / (xMax - xMin)) * plotW;
     const y = (v: number) => PAD.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
     return { dates, ticks, x, y, plotH };
-  }, [series, reference, height]);
+  }, [series, reference, height, width]);
 
   if (!model) {
     return (
@@ -91,7 +100,7 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
     const svg = svgRef.current;
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
-    const px = ((clientX - rect.left) / rect.width) * WIDTH;
+    const px = ((clientX - rect.left) / rect.width) * width;
     let best = 0;
     dates.forEach((d, i) => {
       if (Math.abs(x(toTime(d)) - px) < Math.abs(x(toTime(dates[best])) - px)) best = i;
@@ -121,10 +130,10 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
         )}
       </figcaption>
 
-      <div className="relative">
+      <div ref={boxRef} className="relative">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${height}`}
+          viewBox={`0 0 ${width} ${height}`}
           className="w-full touch-pan-y outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           role="img"
           aria-label={`${title}趨勢圖，${dates[0]} 至 ${dates[dates.length - 1]}`}
@@ -140,7 +149,7 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
         >
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(t)} y2={y(t)} stroke="var(--grid)" strokeWidth={1} />
+              <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} stroke="var(--grid)" strokeWidth={1} />
               <text x={PAD.left - 8} y={y(t)} textAnchor="end" dominantBaseline="middle" className="fill-muted text-[11px] tabular-nums">
                 {format(t)}
               </text>
@@ -151,13 +160,13 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
             <g>
               <line
                 x1={PAD.left}
-                x2={WIDTH - PAD.right}
+                x2={width - PAD.right}
                 y1={y(reference.value)}
                 y2={y(reference.value)}
                 stroke="var(--muted)"
                 strokeWidth={1}
               />
-              <text x={WIDTH - PAD.right + 4} y={y(reference.value)} dominantBaseline="middle" className="fill-muted text-[10px]">
+              <text x={width - PAD.right + 4} y={y(reference.value)} dominantBaseline="middle" className="fill-muted text-[10px]">
                 {reference.label}
               </text>
             </g>
@@ -219,8 +228,8 @@ export function TrendChart({ title, unit, series, reference, height = 200, digit
             role="status"
             className="pointer-events-none absolute top-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-sm"
             style={{
-              left: `${(activeX / WIDTH) * 100}%`,
-              transform: activeX > WIDTH / 2 ? "translateX(calc(-100% - 8px))" : "translateX(8px)",
+              left: `${(activeX / width) * 100}%`,
+              transform: activeX > width / 2 ? "translateX(calc(-100% - 8px))" : "translateX(8px)",
             }}
           >
             <p className="text-muted">{activeDate}</p>
