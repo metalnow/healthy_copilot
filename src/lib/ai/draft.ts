@@ -41,6 +41,8 @@ export const DraftEventSchema = z.discriminatedUnion("kind", [
     sugarG: optionalAmount,
     alcoholG: optionalAmount,
     kcal: optionalAmount,
+    /** 使用者在確認畫面自行修改了熱量（不再是估算值） */
+    kcalByUser: z.boolean().optional(),
     occurredAt: DateTimeLocal,
     confidence: Confidence.optional(),
   }),

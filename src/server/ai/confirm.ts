@@ -72,7 +72,7 @@ export async function confirmDraft(db: Db, user: SessionUser, draft: ConfirmDraf
         caffeineMg: event.caffeineMg,
         sugarG: event.sugarG,
         alcoholG: event.alcoholG,
-        nutrition: event.kcal !== undefined ? { estimated: true, kcal: event.kcal } : undefined,
+        nutrition: event.kcal !== undefined ? { estimated: !event.kcalByUser, kcal: event.kcal } : undefined,
         confidence: event.confidence,
         extractionId,
       });

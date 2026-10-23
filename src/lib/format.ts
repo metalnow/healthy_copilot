@@ -33,3 +33,10 @@ export function formatShortDate(localDate: string): string {
   const [, m, d] = localDate.split("-").map(Number);
   return `${m}/${d}`;
 }
+
+/** YYYY-MM-DD → 10月22日 星期四 */
+export function formatLongDate(localDate: string): string {
+  const [y, m, d] = localDate.split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("zh-TW", { weekday: "long", timeZone: "UTC" });
+  return `${m}月${d}日 ${weekday}`;
+}

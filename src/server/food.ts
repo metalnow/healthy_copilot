@@ -271,7 +271,15 @@ export async function updateDrinkEvent(
   db: Db,
   user: SessionUser,
   id: string,
-  input: { drinkType: DrinkType; name?: string; occurredAt: Date; volumeMl: number; abvPercent?: number },
+  input: {
+    drinkType: DrinkType;
+    name?: string;
+    occurredAt: Date;
+    volumeMl: number;
+    abvPercent?: number;
+    /** 使用者這次修改的熱量（含 AI 重新估算）；undefined 表示沒改，沿用原本的估算並依容量調整 */
+    nutrition?: NutritionEstimate | null;
+  },
 ) {
   const existing = await getDrinkEvent(db, user.id, id);
   if (!existing) return false;
@@ -289,14 +297,21 @@ export async function updateDrinkEvent(
       volumeMl: input.volumeMl,
       waterMl: input.drinkType === "water" ? input.volumeMl : null,
       caffeineMg: scale(existing.caffeineMg),
-      sugarG: scale(existing.sugarG),
+      sugarG: input.nutrition?.sugarG ?? scale(existing.sugarG),
       alcoholG:
         input.drinkType !== "alcohol"
           ? null
           : input.abvPercent !== undefined
             ? alcoholGrams(input.volumeMl, input.abvPercent)
             : scale(existing.alcoholG),
-      nutrition: kcal !== null ? { ...existing.nutrition!, kcal } : null,
+      nutrition:
+        input.drinkType === "water"
+          ? null
+          : input.nutrition !== undefined
+            ? input.nutrition
+            : kcal !== null
+              ? { ...existing.nutrition!, kcal }
+              : null,
       verifiedByUser: true,
     })
     .where(and(eq(drinkEvents.id, id), eq(drinkEvents.userId, user.id)));

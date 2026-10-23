@@ -195,31 +195,49 @@ export async function saveDrink(
   const abvPercent = z.number().min(0).max(100).optional().safeParse(abv);
   const name = formString(formData, "name");
   const time = parseOccurredAt(formString(formData, "occurredAt"), user.timezone, new Date());
+  const nutrition = NutritionEstimateSchema.optional().safeParse(parseNutritionField(formString(formData, "nutrition")));
 
   const fieldErrors: Record<string, string> = {};
   if (!drinkType.success) fieldErrors.drinkType = "請選擇飲料類型";
+  if (!nutrition.success || (nutrition.data?.kcal ?? 0) > 5000) fieldErrors.nutrition = "熱量請輸入 0–5000 kcal";
   if (!volumeMl.success) fieldErrors.volumeMl = "請輸入 1–5000 之間的容量（ml）";
   if (!abvPercent.success) fieldErrors.abvPercent = "酒精濃度請輸入 0–100 之間的數字";
   if (name && name.length > 100) fieldErrors.name = "名稱最多 100 字";
   if ("error" in time) fieldErrors.occurredAt = time.error;
-  if (Object.keys(fieldErrors).length > 0 || !drinkType.success || !volumeMl.success || "error" in time) {
+  if (Object.keys(fieldErrors).length > 0 || !drinkType.success || !volumeMl.success || "error" in time || !nutrition.success) {
     return { fieldErrors };
   }
 
   const db = await getDb();
+  const isWater = drinkType.data === "water";
   const values = {
     drinkType: drinkType.data,
-    name: drinkType.data === "water" ? undefined : name,
+    name: isWater ? undefined : name,
     occurredAt: time.occurredAt,
     volumeMl: volumeMl.data,
     abvPercent: abvPercent.success ? abvPercent.data : undefined,
   };
+  const drinkNutrition = isWater ? undefined : nutrition.data;
+  // 使用者按過「AI 估算熱量」並儲存，即視為確認估算結果
+  const extractionId = formString(formData, "extractionId");
+  const extraction = extractionId ? await getExtraction(db, user.id, extractionId) : null;
+  if (extraction?.task === "food_estimate") await settleExtraction(db, user.id, extraction.id, "confirmed");
+
   if (drinkEventId) {
-    if (!(await updateDrinkEvent(db, user, drinkEventId, values))) return { error: "找不到這筆紀錄" };
+    const changed = formString(formData, "nutritionChanged") === "1";
+    const ok = await updateDrinkEvent(db, user, drinkEventId, {
+      ...values,
+      nutrition: changed ? (drinkNutrition ?? null) : undefined,
+    });
+    if (!ok) return { error: "找不到這筆紀錄" };
     await recordAudit(db, { userId: user.id, action: "drink_event.update", entityId: drinkEventId });
     revalidatePath("/timeline");
   } else {
-    const id = await addDrinkEvent(db, user, values);
+    const id = await addDrinkEvent(db, user, {
+      ...values,
+      nutrition: drinkNutrition,
+      sugarG: drinkNutrition?.sugarG,
+    });
     await recordAudit(db, { userId: user.id, action: "drink_event.create", entityId: id });
   }
   redirect("/");

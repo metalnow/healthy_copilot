@@ -84,9 +84,9 @@ describe("summarize", () => {
           { localDate: "2026-10-13", occurredAt: "2026-10-13T04:00:00Z", mealType: "lunch", kcal: null, satiety: null },
         ],
         drinks: [
-          { localDate: "2026-10-12", drinkType: "water", waterMl: 500, caffeineMg: null, alcoholG: null, sugarG: null },
-          { localDate: "2026-10-12", drinkType: "coffee", waterMl: null, caffeineMg: 150, alcoholG: null, sugarG: null },
-          { localDate: "2026-10-13", drinkType: "alcohol", waterMl: null, caffeineMg: null, alcoholG: 19.7, sugarG: null },
+          { localDate: "2026-10-12", drinkType: "water", waterMl: 500, caffeineMg: null, alcoholG: null, sugarG: null, kcal: null },
+          { localDate: "2026-10-12", drinkType: "coffee", waterMl: null, caffeineMg: 150, alcoholG: null, sugarG: null, kcal: null },
+          { localDate: "2026-10-13", drinkType: "alcohol", waterMl: null, caffeineMg: null, alcoholG: 19.7, sugarG: null, kcal: null },
         ],
         medication: { expected: 10, taken: 7, late: 1, skipped: 1 },
         symptoms: [

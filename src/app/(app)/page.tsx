@@ -1,6 +1,7 @@
 import {
   Activity,
   Camera,
+  ChevronRight,
   Dumbbell,
   FileText,
   Footprints,
@@ -21,9 +22,10 @@ import {
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
-import { formatMl, formatObservation, formatShortDate } from "@/lib/format";
+import { formatLongDate, formatMl, formatObservation, formatShortDate } from "@/lib/format";
 import { DRINK_TYPE_LABELS, OBSERVATION_LABELS } from "@/lib/labels";
 import { countDone } from "@/lib/medication/checklist";
+import { drinkIntake, foodIntake, formatNutrient, sumIntake } from "@/lib/nutrition";
 import {
   evaluateBloodPressure,
   evaluateHeartRate,
@@ -132,13 +134,6 @@ function Tile({
   );
 }
 
-/** 2026-10-22 → 10月22日 星期四 */
-function longDate(localDate: string) {
-  const [y, m, d] = localDate.split("-").map(Number);
-  const weekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("zh-TW", { weekday: "long", timeZone: "UTC" });
-  return `${m}月${d}日 ${weekday}`;
-}
-
 /** 磚塊上的短數值：血壓不帶單位，例如「128/82」 */
 function shortObservation(type: ObservationType, values: Record<string, number | string>) {
   if (type === "blood_pressure") return `${values.systolic}/${values.diastolic}`;
@@ -173,6 +168,8 @@ export default async function TodayPage() {
     review && review.periodEnd >= addDays(today, -13) ? ReviewOutputSchema.safeParse(review.output) : null;
   const focus = reviewOutput?.success ? reviewOutput.data.nextFocus.slice(0, 3) : [];
 
+  const intakeRows = [...food.map(foodIntake), ...drinks.map(drinkIntake)];
+  const intake = { ...sumIntake(intakeRows), rows: intakeRows.length };
   const withKcal = food.filter((f) => f.totalNutrition?.kcal !== undefined);
   const foodKcal = withKcal.length > 0 ? withKcal.reduce((sum, f) => sum + f.totalNutrition!.kcal!, 0) : null;
   const foodKcalEstimated = withKcal.some((f) => f.totalNutrition!.estimated);
@@ -197,7 +194,7 @@ export default async function TodayPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted">{longDate(today)}</p>
+        <p className="text-sm text-muted">{formatLongDate(today)}</p>
         <h1 className="text-2xl font-bold tracking-tight">今日</h1>
       </div>
 
@@ -287,6 +284,45 @@ export default async function TodayPage() {
           <Tile label="檢驗報告" icon={FileText} href="/health/reports/new" cta="上傳" />
         </ul>
       </section>
+
+      {intake.rows > 0 && (
+        <Link
+          href="/nutrition"
+          className="block space-y-3 rounded-2xl border border-border bg-surface p-4 transition active:scale-[0.99] active:bg-accent/5"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">今日營養</h2>
+            <span className="flex items-center text-sm text-accent">
+              明細
+              <ChevronRight aria-hidden className="size-4" />
+            </span>
+          </div>
+          <p className="flex items-baseline gap-1">
+            <span className="text-2xl font-bold tabular-nums">
+              {intake.estimated && intake.totals.kcal ? "約 " : ""}
+              {formatNutrient("kcal", intake.totals.kcal ?? 0)}
+            </span>
+            <span className="text-sm text-muted">kcal・飲食＋飲料{intake.missingKcal > 0 ? `（${intake.missingKcal} 筆未估）` : ""}</span>
+          </p>
+          <dl className="grid grid-cols-3 gap-2 text-sm">
+            {(
+              [
+                ["proteinG", "蛋白質"],
+                ["fatG", "脂肪"],
+                ["carbG", "碳水"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key}>
+                <dt className="text-xs text-muted">{label}</dt>
+                <dd className="font-medium tabular-nums">
+                  {formatNutrient(key, intake.totals[key])}
+                  {intake.totals[key] !== undefined && <span className="ml-0.5 text-xs text-muted">g</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Link>
+      )}
 
       <MedicationChecklist items={checklist} localDate={today} timeZone={user.timezone} />
 

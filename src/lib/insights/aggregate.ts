@@ -35,6 +35,7 @@ export type AggregateInput = {
     caffeineMg: number | null;
     alcoholG: number | null;
     sugarG: number | null;
+    kcal: number | null;
   }[];
   medication: { expected: number; taken: number; late: number; skipped: number };
   symptoms: { localDate: string; type: string; severity: number }[];
@@ -137,9 +138,10 @@ export function summarize(input: AggregateInput) {
 
   const dinners = input.food.filter((f) => f.mealType === "dinner");
   const dinnerTimes = dinners.map((f) => minutesOfDay(toLocalTime(f.occurredAt, input.timeZone)));
-  const kcalByDay = [...byDate(input.food.filter((f) => f.kcal !== null)).entries()].map(([, rows]) =>
-    rows.reduce((s, r) => s + (r.kcal ?? 0), 0),
-  );
+  // 每日熱量：飲食加上飲料
+  const kcalByDay = [
+    ...byDate([...input.food, ...input.drinks].filter((r) => r.kcal !== null)).values(),
+  ].map((rows) => rows.reduce((s, r) => s + (r.kcal ?? 0), 0));
 
   const satietyMeals = input.food.filter((f): f is typeof f & { satiety: number } => f.satiety !== null);
 

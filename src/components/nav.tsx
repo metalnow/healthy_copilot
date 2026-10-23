@@ -15,9 +15,11 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
 /** 底部分頁列只在各分頁的首頁顯示；表單等子頁面像 App 的推入畫面一樣隱藏 */
 const TAB_ROOTS = new Set([...NAV_ITEMS.map((i) => i.href), "/reports"]);
 
-// 記錄表單與用藥管理都屬於「今日」
+// 記錄表單、用藥管理與營養明細都屬於「今日」
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/log") || pathname.startsWith("/medications");
+  if (href === "/") {
+    return pathname === "/" || ["/log", "/medications", "/nutrition"].some((p) => pathname.startsWith(p));
+  }
   if (href === "/insights") return pathname.startsWith("/insights") || pathname.startsWith("/reports");
   return pathname.startsWith(href);
 }

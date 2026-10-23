@@ -168,6 +168,8 @@ export async function getTimeline(
       detail: join(
         d.name,
         d.volumeMl && formatMl(d.volumeMl),
+        d.nutrition?.kcal !== undefined &&
+          (d.nutrition.estimated ? `約 ${Math.round(d.nutrition.kcal)} kcal（估算）` : `${Math.round(d.nutrition.kcal)} kcal`),
         d.caffeineMg && `咖啡因 ${Math.round(d.caffeineMg)} mg`,
         d.alcoholG && `酒精 ${d.alcoholG} g`,
       ),

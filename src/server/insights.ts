@@ -96,6 +96,7 @@ export async function loadAggregateInput(
         caffeineMg: drinkEvents.caffeineMg,
         alcoholG: drinkEvents.alcoholG,
         sugarG: drinkEvents.sugarG,
+        nutrition: drinkEvents.nutrition,
       })
       .from(drinkEvents)
       .where(and(eq(drinkEvents.userId, user.id), gte(drinkEvents.localDate, from), lte(drinkEvents.localDate, to))),
@@ -109,7 +110,7 @@ export async function loadAggregateInput(
     to,
     observations: obs,
     food: food.map((f) => ({ ...f, kcal: f.totalNutrition?.kcal ?? null })),
-    drinks,
+    drinks: drinks.map(({ nutrition, ...d }) => ({ ...d, kcal: nutrition?.kcal ?? null })),
     sleep: lifestyle.sleep,
     activity: lifestyle.activity,
     exercise: lifestyle.exercise,

@@ -239,13 +239,19 @@ function EventCard({
                 />
                 <span className="self-center text-sm text-muted">ml</span>
               </div>
-              {(event.caffeineMg !== undefined || event.sugarG !== undefined || event.alcoholG !== undefined || event.kcal !== undefined) && (
+              {event.drinkType !== "water" && (
+                <KcalInput
+                  nutrition={event.kcal !== undefined ? { estimated: !event.kcalByUser, kcal: event.kcal } : undefined}
+                  onChange={(n) => update({ kcal: n?.kcal, kcalByUser: true })}
+                  label="飲料熱量"
+                />
+              )}
+              {(event.caffeineMg !== undefined || event.sugarG !== undefined || event.alcoholG !== undefined) && (
                 <Estimate>
                   {[
                     event.caffeineMg !== undefined && `咖啡因 ${Math.round(event.caffeineMg)} mg`,
                     event.sugarG !== undefined && `糖 ${Math.round(event.sugarG)} g`,
                     event.alcoholG !== undefined && `酒精 ${event.alcoholG} g`,
-                    event.kcal !== undefined && `約 ${Math.round(event.kcal)} kcal`,
                   ]
                     .filter(Boolean)
                     .join("・")}
