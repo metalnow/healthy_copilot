@@ -238,7 +238,8 @@ export function draftFromTextParse(result: TextParseResult, now: Date, timeZone:
         exerciseType: event.exerciseType ?? "other",
         durationMin: duration,
         intensity: event.intensity ?? undefined,
-        afterMeal: event.afterMeal ?? undefined,
+        // 模型未提及時填 false，視為沒有資訊
+        afterMeal: event.afterMeal || undefined,
         occurredAt: resolveOccurredAt(event, now, timeZone),
         confidence,
       });

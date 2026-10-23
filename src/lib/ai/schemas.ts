@@ -10,10 +10,25 @@ import {
 import { SYMPTOM_TYPES } from "@/lib/schemas/symptom";
 import { OBSERVATION_TYPES } from "@/lib/schemas/observation";
 
-// AI 輸出用的 schema：所有欄位必填、無值用 null、不加數值範圍限制，
-// 讓各供應商的 strict structured output 都能接受。數值合理性在使用者確認後由領域 schema 驗證。
+// AI 輸出用的 schema：所有欄位必填、不加數值範圍限制，讓各供應商的 strict structured output 都能接受。
+// 數值合理性在使用者確認後由領域 schema 驗證。
+//
+// Claude 的 structured output 每個 schema 最多 16 個 union 型別欄位（含 ["number","null"]），
+// 所以「沒有值」盡量不用 null：列舉加 "none"、文字填空字串、不可能為 0 的數值填 0，
+// 再用 transform 轉回 null，程式其他地方看到的型別不變。只有 0 有意義的估算值（糖、熱量等）才用 null。
 
 const num = z.number().nullable();
+
+/** 列舉＋"none"（輸出時轉為 null） */
+function enumOrNone<const T extends readonly [string, ...string[]]>(values: T) {
+  return z.enum([...values, "none"] as [...T, "none"]).transform((v) => (v === "none" ? null : (v as T[number])));
+}
+
+/** 文字；空字串轉為 null */
+const text = () => z.string().transform((v) => (v.trim() === "" ? null : v));
+
+/** 必須大於 0 的數值；0（或負數）轉為 null */
+const positive = () => z.number().transform((v) => (v > 0 ? v : null));
 
 export const AiNutritionSchema = z
   .strictObject({
@@ -29,92 +44,89 @@ export const AiNutritionSchema = z
 
 export const AiFoodItemSchema = z.strictObject({
   name: z.string().describe("食物名稱，繁體中文"),
-  portion: z.string().nullable().describe("份量描述，例如「1 碗」「2 塊」「約 200 g」"),
-  quantity: num.describe("數量，無法判斷填 null"),
-  cookingMethod: z.string().nullable().describe("烹調方式，例如 炸、炒、蒸、烤"),
-  hasSauce: z.boolean().nullable(),
+  portion: text().describe("份量描述，例如「1 碗」「2 塊」「約 200 g」；無法判斷填空字串"),
   confidence: z.number().describe("對此品項辨識的信心 0–1"),
   nutrition: AiNutritionSchema,
 });
-export type AiFoodItem = z.infer<typeof AiFoodItemSchema>;
+export type AiFoodItem = z.output<typeof AiFoodItemSchema>;
 
 export const FoodEstimateSchema = z.strictObject({
   items: z
     .array(z.strictObject({ nutrition: AiNutritionSchema, confidence: z.number().describe("估算信心 0–1") }))
     .describe("與輸入品項相同順序、相同數量"),
 });
-export type FoodEstimate = z.infer<typeof FoodEstimateSchema>;
+export type FoodEstimate = z.output<typeof FoodEstimateSchema>;
 
 export const AiDrinkItemSchema = z.strictObject({
   drinkType: z.enum(DRINK_TYPES),
-  name: z.string().nullable().describe("飲料名稱，例如 珍珠奶茶、美式咖啡"),
-  volumeMl: num.describe("容量 ml"),
+  name: text().describe("飲料名稱，例如 珍珠奶茶、美式咖啡；無法判斷填空字串"),
+  volumeMl: positive().describe("容量 ml；無法判斷填 0"),
   caffeineMg: num.describe("估計的咖啡因 mg"),
   sugarG: num.describe("估計的糖 g"),
   alcoholG: num.describe("估計的酒精 g"),
   kcal: num.describe("估計的熱量 kcal"),
   confidence: z.number().describe("對此飲料辨識的信心 0–1"),
 });
-export type AiDrinkItem = z.infer<typeof AiDrinkItemSchema>;
+export type AiDrinkItem = z.output<typeof AiDrinkItemSchema>;
 
 export const FoodPhotoResultSchema = z.strictObject({
   isFood: z.boolean().describe("照片中是否有食物或飲料"),
-  mealType: z.enum(MEAL_TYPES).nullable().describe("依內容推測的餐別，無法判斷填 null"),
+  mealType: enumOrNone(MEAL_TYPES).describe("依內容推測的餐別，無法判斷填 none"),
   items: z.array(AiFoodItemSchema).describe("食物品項，不含飲料"),
   drinks: z.array(AiDrinkItemSchema).describe("飲料，每杯 / 每瓶一筆"),
   overallConfidence: z.number().describe("整體信心 0–1"),
-  notes: z.string().nullable().describe("給使用者的簡短補充，例如看不清楚的部分"),
+  notes: text().describe("給使用者的簡短補充，例如看不清楚的部分；沒有填空字串"),
 });
-export type FoodPhotoResult = z.infer<typeof FoodPhotoResultSchema>;
+export type FoodPhotoResult = z.output<typeof FoodPhotoResultSchema>;
 
 export const AI_EVENT_KINDS = ["food", "drink", "measurement", "exercise", "symptom"] as const;
 
-/** 扁平結構：依 kind 使用對應欄位，其餘填 null（比 union 更容易被各模型正確輸出） */
+/** 扁平結構：依 kind 使用對應欄位，其餘填 none / 空字串 / 0（比 union 更容易被各模型正確輸出） */
 export const AiEventSchema = z.strictObject({
   kind: z.enum(AI_EVENT_KINDS),
   dayOffset: z.number().describe("相對今天的天數：今天 0、昨天 -1"),
-  localTime: z.string().nullable().describe("當地時間 HH:mm（24 小時制）；未提及填 null"),
+  localTime: text().describe("當地時間 HH:mm（24 小時制）；未提及填空字串"),
   confidence: z.number().describe("對此事件解析的信心 0–1"),
 
-  mealType: z.enum(MEAL_TYPES).nullable().describe("kind=food 時的餐別"),
+  mealType: enumOrNone(MEAL_TYPES).describe("kind=food 時的餐別；其他填 none"),
   items: z.array(AiFoodItemSchema).describe("kind=food 時的品項；其他 kind 填空陣列"),
 
-  drinkType: z.enum(DRINK_TYPES).nullable().describe("kind=drink 時的類型"),
-  drinkName: z.string().nullable().describe("kind=drink 時的名稱，例如 無糖拿鐵"),
-  volumeMl: num.describe("kind=drink 時的容量 ml"),
+  drinkType: enumOrNone(DRINK_TYPES).describe("kind=drink 時的類型；其他填 none"),
+  drinkName: text().describe("kind=drink 時的名稱，例如 無糖拿鐵；其他填空字串"),
+  volumeMl: positive().describe("kind=drink 時的容量 ml；未知或其他填 0"),
   caffeineMg: num.describe("kind=drink 時估計的咖啡因 mg"),
   sugarG: num.describe("kind=drink 時估計的糖 g"),
   alcoholG: num.describe("kind=drink 時估計的酒精 g"),
   drinkKcal: num.describe("kind=drink 時估計的熱量 kcal"),
 
-  measurementType: z.enum(OBSERVATION_TYPES).nullable().describe("kind=measurement 時的量測類型"),
-  weightKg: num,
-  systolic: num,
-  diastolic: num,
-  pulse: num,
-  bpm: num,
-  waistCm: num,
+  measurementType: enumOrNone(OBSERVATION_TYPES).describe("kind=measurement 時的量測類型；其他填 none"),
+  weightKg: positive().describe("體重 kg；沒有填 0"),
+  systolic: positive().describe("收縮壓；沒有填 0"),
+  diastolic: positive().describe("舒張壓；沒有填 0"),
+  pulse: positive().describe("脈搏；沒有填 0"),
+  bpm: positive().describe("心率；沒有填 0"),
+  waistCm: positive().describe("腰圍 cm；沒有填 0"),
 
-  exerciseType: z.enum(EXERCISE_TYPES).nullable().describe("kind=exercise 時的運動類型"),
-  durationMin: num.describe("kind=exercise 或 symptom 時的持續分鐘數"),
-  intensity: z.enum(INTENSITIES).nullable().describe("kind=exercise 時的強度"),
-  afterMeal: z.boolean().nullable().describe("kind=exercise 時是否為飯後運動"),
+  exerciseType: enumOrNone(EXERCISE_TYPES).describe("kind=exercise 時的運動類型；其他填 none"),
+  durationMin: positive().describe("kind=exercise 或 symptom 時的持續分鐘數；未提及填 0"),
+  intensity: enumOrNone(INTENSITIES).describe("kind=exercise 時的強度；未提及填 none"),
+  afterMeal: z.boolean().describe("kind=exercise 時是否為飯後運動；未提及填 false"),
 
-  symptomType: z.enum(SYMPTOM_TYPES).nullable().describe("kind=symptom 時的症狀或生活事件類型"),
-  severity: num.describe("kind=symptom 時的嚴重度 1–5"),
-  note: z.string().nullable().describe("kind=symptom 時的簡短描述"),
+  symptomType: enumOrNone(SYMPTOM_TYPES).describe("kind=symptom 時的症狀或生活事件類型；其他填 none"),
+  severity: positive().describe("kind=symptom 時的嚴重度 1–5；其他填 0"),
+  note: text().describe("kind=symptom 時的簡短描述；其他填空字串"),
 });
-export type AiEvent = z.infer<typeof AiEventSchema>;
+export type AiEvent = z.output<typeof AiEventSchema>;
 
 export const TextParseResultSchema = z.strictObject({
   events: z.array(AiEventSchema),
-  unparsed: z.string().nullable().describe("無法歸類的內容，原文保留；沒有則填 null"),
+  unparsed: text().describe("無法歸類的內容，原文保留；沒有則填空字串"),
 });
-export type TextParseResult = z.infer<typeof TextParseResultSchema>;
+export type TextParseResult = z.output<typeof TextParseResultSchema>;
 
-/** 送給 OpenRouter 的 JSON Schema（去掉 $schema 欄位） */
+/** 送給 OpenRouter 的 JSON Schema（模型輸出的格式，即 transform 之前；去掉 $schema 欄位） */
 export function toResponseSchema(schema: z.ZodType) {
-  const json = z.toJSONSchema(schema) as Record<string, unknown>;
+  const json = z.toJSONSchema(schema, { io: "input" }) as Record<string, unknown>;
   delete json.$schema;
   return json;
 }

@@ -16,9 +16,6 @@ const nullNutrition = { kcal: null, proteinG: null, fatG: null, carbG: null, fib
 const item = (name: string, kcal: number | null = null): AiFoodItem => ({
   name,
   portion: "1 份",
-  quantity: 1,
-  cookingMethod: null,
-  hasSauce: null,
   confidence: 0.9,
   nutrition: { ...nullNutrition, kcal },
 });
@@ -47,7 +44,7 @@ const baseEvent: AiEvent = {
   exerciseType: null,
   durationMin: null,
   intensity: null,
-  afterMeal: null,
+  afterMeal: false,
   symptomType: null,
   severity: null,
   note: null,
