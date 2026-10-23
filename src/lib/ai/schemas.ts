@@ -75,6 +75,8 @@ export const FoodPhotoResultSchema = z.strictObject({
   items: z.array(AiFoodItemSchema).describe("食物品項，不含飲料"),
   drinks: z.array(AiDrinkItemSchema).describe("飲料，每杯 / 每瓶一筆"),
   overallConfidence: z.number().describe("整體信心 0–1"),
+  satiety: positive().describe("使用者說明中的飽足感 1–5；沒提到填 0"),
+  feeling: text().describe("使用者說明中對這餐的感受（精簡原話）；沒有填空字串"),
   notes: text().describe("給使用者的簡短補充，例如看不清楚的部分；沒有填空字串"),
 });
 export type FoodPhotoResult = z.output<typeof FoodPhotoResultSchema>;
@@ -89,6 +91,7 @@ export const AiEventSchema = z.strictObject({
   confidence: z.number().describe("對此事件解析的信心 0–1"),
 
   mealType: enumOrNone(MEAL_TYPES).describe("kind=food 時的餐別；其他填 none"),
+  satiety: positive().describe("kind=food 時使用者提到的飽足感 1–5；沒提到或其他 kind 填 0"),
   items: z.array(AiFoodItemSchema).describe("kind=food 時的品項；其他 kind 填空陣列"),
 
   drinkType: enumOrNone(DRINK_TYPES).describe("kind=drink 時的類型；其他填 none"),
@@ -114,7 +117,7 @@ export const AiEventSchema = z.strictObject({
 
   symptomType: enumOrNone(SYMPTOM_TYPES).describe("kind=symptom 時的症狀或生活事件類型；其他填 none"),
   severity: positive().describe("kind=symptom 時的嚴重度 1–5；其他填 0"),
-  note: text().describe("kind=symptom 時的簡短描述；其他填空字串"),
+  note: text().describe("kind=symptom 時的簡短描述；kind=food 時對這餐的感受；其他填空字串"),
 });
 export type AiEvent = z.output<typeof AiEventSchema>;
 

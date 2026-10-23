@@ -79,9 +79,9 @@ describe("summarize", () => {
           { localDate: "2026-10-14", durationMin: 30, afterMeal: false },
         ],
         food: [
-          { localDate: "2026-10-12", occurredAt: "2026-10-12T11:00:00Z", mealType: "dinner", kcal: 700 },
-          { localDate: "2026-10-13", occurredAt: "2026-10-13T12:30:00Z", mealType: "dinner", kcal: 900 },
-          { localDate: "2026-10-13", occurredAt: "2026-10-13T04:00:00Z", mealType: "lunch", kcal: null },
+          { localDate: "2026-10-12", occurredAt: "2026-10-12T11:00:00Z", mealType: "dinner", kcal: 700, satiety: 5 },
+          { localDate: "2026-10-13", occurredAt: "2026-10-13T12:30:00Z", mealType: "dinner", kcal: 900, satiety: 2 },
+          { localDate: "2026-10-13", occurredAt: "2026-10-13T04:00:00Z", mealType: "lunch", kcal: null, satiety: null },
         ],
         drinks: [
           { localDate: "2026-10-12", drinkType: "water", waterMl: 500, caffeineMg: null, alcoholG: null, sugarG: null },
@@ -105,7 +105,7 @@ describe("summarize", () => {
       afterMealExerciseDays: 1,
     });
     // 晚餐 19:00 與 20:30（台北）→ 平均 19:45，一次晚於 20:00
-    expect(s.food).toEqual({ mealsLogged: 3, daysLogged: 2, avgEstimatedKcalPerDay: 800, avgDinnerTime: "19:45", lateDinners: 1 });
+    expect(s.food).toEqual({ mealsLogged: 3, daysLogged: 2, avgEstimatedKcalPerDay: 800, avgDinnerTime: "19:45", lateDinners: 1, satietyLogged: 2, avgSatiety: 3.5, highKcalLowSatiety: 1, lowKcalHighSatiety: 0 });
     expect(s.drinks).toMatchObject({ caffeineMgTotal: 150, alcoholGTotal: 19.7, alcoholDays: 1 });
     expect(s.medication.adherencePercent).toBe(80);
     expect(s.symptoms).toEqual({ count: 2, byType: { headache: 2 }, severeCount: 1 });
@@ -144,15 +144,28 @@ describe("deterministicInsights", () => {
       input({
         observations: [obs("blood_pressure", "2026-10-13", 8, { systolic: 145, diastolic: 92 })],
         exercise: [{ localDate: "2026-10-12", durationMin: 15, afterMeal: true }],
-        food: [{ localDate: "2026-10-13", occurredAt: "2026-10-13T12:30:00Z", mealType: "dinner", kcal: null }],
+        food: [{ localDate: "2026-10-13", occurredAt: "2026-10-13T12:30:00Z", mealType: "dinner", kcal: null, satiety: null }],
       }),
     );
     const previous = summarize(
-      input({ food: [{ localDate: "2026-10-06", occurredAt: "2026-10-06T11:48:00Z", mealType: "dinner", kcal: null }] }),
+      input({ food: [{ localDate: "2026-10-06", occurredAt: "2026-10-06T11:48:00Z", mealType: "dinner", kcal: null, satiety: null }] }),
     );
     const insights = deterministicInsights(current, previous, [360, 400, 380]);
     expect(insights.map((i) => i.id)).toEqual(["bp_high_readings", "sleep_short", "dinner_shift"]);
     expect(insights[2].text).toBe("晚餐平均時間比前一期晚 42 分鐘（20:30）");
+  });
+
+  it("比較熱量與飽足感", () => {
+    const meal = (day: number, kcal: number, satiety: number) => ({
+      localDate: `2026-10-1${day}`,
+      occurredAt: `2026-10-1${day}T04:00:00Z`,
+      mealType: "lunch",
+      kcal,
+      satiety,
+    });
+    const current = summarize(input({ food: [meal(2, 850, 2), meal(3, 350, 4), meal(4, 300, 5), meal(5, 600, 3)] }));
+    expect(current.food).toMatchObject({ satietyLogged: 4, avgSatiety: 3.5, highKcalLowSatiety: 1, lowKcalHighSatiety: 2 });
+    expect(deterministicInsights(current, null, []).map((i) => i.id)).toEqual(["kcal_not_filling", "light_but_filling"]);
   });
 
   it("資料不足時不產生", () => {

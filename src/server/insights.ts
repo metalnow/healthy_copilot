@@ -84,6 +84,7 @@ export async function loadAggregateInput(
         occurredAt: foodEvents.occurredAt,
         mealType: foodEvents.mealType,
         totalNutrition: foodEvents.totalNutrition,
+        satiety: foodEvents.satiety,
       })
       .from(foodEvents)
       .where(and(eq(foodEvents.userId, user.id), gte(foodEvents.localDate, from), lte(foodEvents.localDate, to))),

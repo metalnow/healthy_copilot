@@ -1,0 +1,1 @@
+ALTER TABLE `food_events` ADD `satiety` integer;

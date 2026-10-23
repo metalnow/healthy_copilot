@@ -22,6 +22,7 @@ export async function addFoodEvent(
     inputType: FoodInputType;
     items: FoodItemInput[];
     note?: string;
+    satiety?: number;
     totalNutrition?: NutritionEstimate;
     aiConfidence?: number;
     mediaId?: string;
@@ -37,6 +38,7 @@ export async function addFoodEvent(
       ...eventTimeFields(input.occurredAt, user.timezone),
       inputType: input.inputType,
       note: input.note,
+      satiety: input.satiety,
       totalNutrition: input.totalNutrition,
       aiConfidence: input.aiConfidence,
       mediaId: input.mediaId,
@@ -198,6 +200,7 @@ export async function updateFoodEvent(
     occurredAt: Date;
     items: FoodItemInput[];
     note?: string;
+    satiety?: number;
     totalNutrition?: NutritionEstimate;
   },
 ) {
@@ -210,6 +213,7 @@ export async function updateFoodEvent(
         mealType: input.mealType,
         ...eventTimeFields(input.occurredAt, user.timezone),
         note: input.note ?? null,
+        satiety: input.satiety ?? null,
         totalNutrition: input.totalNutrition ?? null,
       })
       .where(and(eq(foodEvents.id, id), eq(foodEvents.userId, user.id))),

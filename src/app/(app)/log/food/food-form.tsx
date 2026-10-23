@@ -6,7 +6,7 @@ import { ChipGroup, Field, FormError, inputClass, SubmitButton } from "@/compone
 import { KcalInput, kcalTotal } from "@/components/kcal-input";
 import { MEAL_TYPES, type MealType } from "@/lib/enums";
 import type { ActionState } from "@/lib/form";
-import { MEAL_TYPE_LABELS } from "@/lib/labels";
+import { MEAL_TYPE_LABELS, SATIETY_LABELS } from "@/lib/labels";
 import type { NutritionEstimate } from "@/lib/schemas/common";
 import type { AiTaskResult } from "@/server/ai/tasks";
 import type { FoodItemDraft } from "@/server/food";
@@ -21,7 +21,7 @@ type Props = {
   recentNames: string[];
   aiConfigured: boolean;
   /** 編輯既有紀錄時的品項與備註 */
-  defaults?: { items: FoodItemDraft[]; note?: string };
+  defaults?: { items: FoodItemDraft[]; note?: string; satiety?: number };
 };
 
 let nextKey = 1;
@@ -232,7 +232,16 @@ export function FoodForm({
         />
       </Field>
 
-      <Field label="備註（選填）" htmlFor="note">
+      <Field label="飽足感（選填）">
+        <ChipGroup
+          name="satiety"
+          label="飽足感"
+          defaultValue={defaults?.satiety ? String(defaults.satiety) : undefined}
+          options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: SATIETY_LABELS[n] }))}
+        />
+      </Field>
+
+      <Field label="感受 / 備註（選填）" htmlFor="note" hint="例如 吃完很撐、太油、餐後想睡，回顧時會和熱量一起比較">
         <input id="note" name="note" defaultValue={defaults?.note} maxLength={2000} className={inputClass} />
       </Field>
 

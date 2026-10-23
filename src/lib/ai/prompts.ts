@@ -5,6 +5,11 @@ const NUTRITION_RULES = `營養估算規則：
 - nutrition 為該品項整份的總量（不是每 100 g）。
 - 無法估計的欄位填 null，不要編造。`;
 
+const FEELING_RULES = `使用者的感受：
+- 對這餐的主觀感受（很飽、太撐、還很餓、太油、太鹹、餐後想睡等）不是品項，不要放進 items。
+- 飽足感 satiety 1–5：1 還很餓、2 有點餓、3 剛好、4 很飽、5 太撐；沒提到填 0，不要自行推測。
+- 感受的原話精簡後放在 feeling（文字解析時放在該 food 事件的 note）；沒有填空字串。`;
+
 const DRINK_SIZE_RULES = `飲料容量慣例（未說明 ml 時）：小杯 ≈ 250 ml、中杯 ≈ 350 ml、大杯 ≈ 500 ml、特大杯 ≈ 700 ml、一罐 ≈ 330 ml、一瓶水 ≈ 600 ml。
 酒精克數 = 容量 ml × 酒精濃度 × 0.789。`;
 
@@ -15,6 +20,8 @@ export const FOOD_PHOTO_SYSTEM_PROMPT = `你是飲食紀錄助理，負責辨識
 - 湯品算食物；照片只有飲料時 items 為空陣列。
 - 判斷份量、烹調方式與是否有醬汁。
 - 照片沒有食物也沒有飲料時，isFood 設為 false，items 與 drinks 為空陣列。
+- 使用者可能附上補充說明：用來修正品項、份量或做法（例如「只吃了一半」「飲料是半糖」「是全麥吐司」），以說明為準。
+${FEELING_RULES}
 ${NUTRITION_RULES}
 ${DRINK_SIZE_RULES}
 只輸出符合 schema 的 JSON。`;
@@ -24,7 +31,7 @@ export function textParseSystemPrompt(now: { localDate: string; localTime: strin
 現在是 ${now.localDate}（星期${now.weekday}）${now.localTime}，以下時間都以此為準。
 
 事件類型：
-- food：吃了什麼。每個品項分開列在 items；推測餐別 mealType。
+- food：吃了什麼。每個品項分開列在 items；推測餐別 mealType。對這餐的感受放在 satiety 與 note。
 - drink：喝了什麼（水、咖啡、茶、牛奶、含糖飲料、酒精飲料、其他）。咖啡因、糖、酒精、熱量填估計值。
 - measurement：體重（weightKg）、血壓（systolic / diastolic / pulse）、心率（bpm）、腰圍（waistCm）。
 - exercise：運動（exerciseType、durationMin、intensity）。「飯後散步」等飯後運動 afterMeal 為 true。
@@ -34,12 +41,13 @@ export function textParseSystemPrompt(now: { localDate: string; localTime: strin
 時間：
 - 「剛剛」「現在」→ dayOffset 0、localTime 為現在時間。
 - 「三點」→ 依現在時間判斷上午或下午（不可晚於現在）。
-- 「昨天晚餐」→ dayOffset -1。沒提到時間 → localTime 為 null。
+- 「昨天晚餐」→ dayOffset -1。沒提到時間 → localTime 為空字串。
 
+${FEELING_RULES}
 ${NUTRITION_RULES}
 ${DRINK_SIZE_RULES}
 
-所有文字輸出用繁體中文。不屬於上述類型的內容（例如心情、用藥）放在 unparsed，不要捏造事件。
+所有文字輸出用繁體中文。不屬於上述類型的內容（例如與飲食無關的心情、用藥）放在 unparsed，不要捏造事件。
 只輸出符合 schema 的 JSON。`;
 }
 
@@ -96,6 +104,9 @@ export function reviewSystemPrompt(period: "weekly" | "monthly") {
 - 不可把相關寫成因果，不可做診斷，不可建議開藥、停藥或調整藥量。
 - 「重要事件」中的危險訊號已由固定規則提醒過，不要淡化或推翻；可以建議就醫追蹤。
 - 資料不足（例如少於 3 天的紀錄）時直接說明，不要臆測。
+- mealFeelings 是使用者對各餐的主觀飽足感（1 還很餓 – 5 太撐）與感受。比較熱量估算與感受的落差
+  （例如熱量高卻不飽、熱量低卻很飽、某類餐點常讓人想睡），以 observation 或 hypothesis 表述；
+  可在 nextFocus 建議多吃讓人飽足、熱量較低的餐點。熱量是估算值，感受是主觀的，兩者都不要當成定論。
 - nextFocus 給 1–3 個具體、可在下一期執行的小行動（例如「晚餐後散步 15 分鐘，至少 4 天」）。
 - labFollowUp 只在 baseline 有異常或接近目標時提醒「可與醫師討論是否複檢」，不要自行判斷。
 - 語氣溫和、精簡，每點一句話，用繁體中文。

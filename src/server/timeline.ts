@@ -11,6 +11,7 @@ import {
   MEAL_TYPE_LABELS,
   MEDICATION_STATUS_LABELS,
   OBSERVATION_LABELS,
+  SATIETY_LABELS,
   SEVERITY_LABELS,
   SLEEP_QUALITY_LABELS,
   SYMPTOM_LABELS,
@@ -150,6 +151,8 @@ export async function getTimeline(
           (f.totalNutrition.estimated
             ? `約 ${Math.round(f.totalNutrition.kcal)} kcal（估算）`
             : `${Math.round(f.totalNutrition.kcal)} kcal`),
+        f.satiety && `飽足感：${SATIETY_LABELS[f.satiety]}`,
+        f.note,
       ),
       ai: f.extractionId !== null,
     })),

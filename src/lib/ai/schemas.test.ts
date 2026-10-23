@@ -64,6 +64,7 @@ describe("沒有值的表示方式", () => {
           localTime: "",
           confidence: 0.8,
           mealType: "none",
+          satiety: 0,
           items: [{ name: "蛋", portion: "", confidence: 0.9, nutrition: { kcal: 80, proteinG: null, fatG: null, carbG: null, fiberG: null, sugarG: null, sodiumMg: null } }],
           drinkType: "none",
           drinkName: "",
@@ -91,7 +92,7 @@ describe("沒有值的表示方式", () => {
     });
     const [event] = parsed.events;
     expect(parsed.unparsed).toBeNull();
-    expect(event).toMatchObject({ localTime: null, mealType: null, drinkType: null, volumeMl: null, weightKg: null, severity: null, note: null });
+    expect(event).toMatchObject({ localTime: null, mealType: null, satiety: null, drinkType: null, volumeMl: null, weightKg: null, severity: null, note: null });
     expect(event.items[0].portion).toBeNull();
   });
 });

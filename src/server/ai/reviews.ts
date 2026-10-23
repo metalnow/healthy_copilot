@@ -1,12 +1,13 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { aiReviews, users } from "@/db/schema";
+import { aiReviews, foodEvents, foodItems, users } from "@/db/schema";
 import { AiError } from "@/lib/ai/openrouter";
 import { reviewSystemPrompt } from "@/lib/ai/prompts";
 import { ReviewOutputSchema, type ReviewOutput } from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
 import { getGoalMetric, goalProgress } from "@/lib/goals";
 import { getLabDefinition } from "@/lib/labs/catalog";
+import { MEAL_TYPE_LABELS, SATIETY_LABELS } from "@/lib/labels";
 import { monthBounds, weekBounds } from "@/lib/insights/periods";
 import { evaluateBloodPressure, evaluateSymptom } from "@/lib/safety/rules";
 import { toLocalDate } from "@/lib/time";
@@ -62,7 +63,46 @@ export async function requestReview(
   return row.id;
 }
 
-/** 送給模型的輸入：只有彙總數字，不含任何身分資料或原始紀錄 */
+const MAX_MEAL_FEELINGS = 20;
+
+/** 有記錄飽足感或感受的餐（最近的在前），供模型比較熱量估算與主觀感受 */
+async function mealFeelings(db: Db, userId: string, from: string, to: string) {
+  const meals = await db
+    .select({
+      id: foodEvents.id,
+      localDate: foodEvents.localDate,
+      mealType: foodEvents.mealType,
+      totalNutrition: foodEvents.totalNutrition,
+      satiety: foodEvents.satiety,
+      note: foodEvents.note,
+    })
+    .from(foodEvents)
+    .where(
+      and(
+        eq(foodEvents.userId, userId),
+        gte(foodEvents.localDate, from),
+        lte(foodEvents.localDate, to),
+        or(isNotNull(foodEvents.satiety), isNotNull(foodEvents.note)),
+      ),
+    )
+    .orderBy(desc(foodEvents.occurredAt))
+    .limit(MAX_MEAL_FEELINGS);
+  if (meals.length === 0) return [];
+  const items = await db
+    .select({ foodEventId: foodItems.foodEventId, name: foodItems.name })
+    .from(foodItems)
+    .where(inArray(foodItems.foodEventId, meals.map((m) => m.id)));
+  return meals.map((m) => ({
+    date: m.localDate,
+    meal: MEAL_TYPE_LABELS[m.mealType],
+    items: items.filter((i) => i.foodEventId === m.id).map((i) => i.name).slice(0, 8),
+    kcal: m.totalNutrition?.kcal !== undefined ? Math.round(m.totalNutrition.kcal) : null,
+    satiety: m.satiety ? `${m.satiety}（${SATIETY_LABELS[m.satiety]}）` : null,
+    feeling: m.note?.slice(0, 80) ?? null,
+  }));
+}
+
+/** 送給模型的輸入：彙總數字與各餐的感受摘要，不含任何身分資料 */
 async function buildReviewInput(db: Db, user: { id: string; timezone: string }, review: ReviewRow) {
   const { currentInput, current, previous } = await summariesWithPrevious(db, user, review.periodStart, review.periodEnd);
 
@@ -105,7 +145,15 @@ async function buildReviewInput(db: Db, user: { id: string; timezone: string }, 
     .filter((e) => e.alert)
     .map((e) => ({ date: e.date, event: e.alert!.title }));
 
-  return { period: review.period, current, previous, baselineLabs: labs, goals: goalSummaries, notableEvents };
+  return {
+    period: review.period,
+    current,
+    previous,
+    baselineLabs: labs,
+    goals: goalSummaries,
+    notableEvents,
+    mealFeelings: await mealFeelings(db, user.id, review.periodStart, review.periodEnd),
+  };
 }
 
 const RETRYABLE: AiError["code"][] = ["timeout", "provider_error", "rate_limited"];

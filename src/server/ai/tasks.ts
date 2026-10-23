@@ -142,6 +142,8 @@ export async function analyzeFoodPhoto(
   env: Env,
   user: SessionUser,
   photo: { bytes: Uint8Array<ArrayBuffer>; mimeType: string; filename?: string },
+  /** 使用者的補充說明或感受（選填） */
+  note?: string,
 ): Promise<AiTaskResult> {
   const mediaId = await putMedia(db, env.MEDIA, user.id, { kind: "food_photo", ...photo });
 
@@ -154,6 +156,7 @@ export async function analyzeFoodPhoto(
       user: [
         { type: "text", text: "請辨識這張照片中的食物與飲料。" },
         { type: "image_url", image_url: { url: `data:${photo.mimeType};base64,${toBase64(photo.bytes)}` } },
+        ...(note ? [{ type: "text" as const, text: `使用者補充說明：${note}` }] : []),
       ],
       schema: FoodPhotoResultSchema,
       schemaName: "food_photo",

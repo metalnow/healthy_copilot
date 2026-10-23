@@ -148,11 +148,13 @@ export async function saveFood(
   if (!mealType.success || "error" in time || !items.success) return { fieldErrors };
 
   const db = await getDb();
+  const satiety = z.coerce.number().int().min(1).max(5).optional().safeParse(formString(formData, "satiety"));
   const values = {
     mealType: mealType.data,
     occurredAt: time.occurredAt,
     items: items.data,
     note: formString(formData, "note")?.slice(0, 2000),
+    satiety: satiety.success ? satiety.data : undefined,
     totalNutrition: sumNutrition(items.data),
   };
   // 使用者按過「AI 估算熱量」並儲存，即視為確認估算結果

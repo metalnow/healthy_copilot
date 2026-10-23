@@ -59,6 +59,11 @@ function Domains({ s, p }: { s: PeriodSummary; p: PeriodSummary }) {
         <Stat label="腰圍" value={fmt(s.waist.last, " cm")} sub={s.waist.change !== null ? `變化 ${s.waist.change} cm` : undefined} />
         <Stat label="每日熱量（估算）" value={fmt(s.food.avgEstimatedKcalPerDay, " kcal")} />
         <Stat label="晚餐平均時間" value={s.food.avgDinnerTime ?? "—"} sub={s.food.lateDinners ? `20:00 後 ${s.food.lateDinners} 次` : undefined} />
+        <Stat
+          label="平均飽足感（1–5）"
+          value={fmt(s.food.avgSatiety)}
+          sub={s.food.satietyLogged ? `${s.food.satietyLogged} 餐有記錄` : undefined}
+        />
       </Domain>
       <Domain title="心血管">
         <Stat

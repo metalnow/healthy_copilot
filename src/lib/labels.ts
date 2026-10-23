@@ -99,4 +99,7 @@ export const INTENSITY_LABELS: Record<(typeof INTENSITIES)[number], string> = {
   high: "高強度",
 };
 
+/** 飽足感 1–5（索引即數值） */
+export const SATIETY_LABELS = ["", "還很餓", "有點餓", "剛好", "很飽", "太撐"] as const;
+
 export const SLEEP_QUALITY_LABELS = ["", "很差", "差", "普通", "好", "很好"] as const;

@@ -333,6 +333,8 @@ export const foodEvents = sqliteTable(
     ...eventTime(),
     inputType: text("input_type", { enum: INPUT_TYPES }).notNull(),
     totalNutrition: jsonText<NutritionEstimate>("total_nutrition"),
+    /** 主觀飽足感 1（還很餓）– 5（太撐）；感受的文字放在 note */
+    satiety: integer("satiety"),
     aiConfidence: real("ai_confidence"),
     mediaId: text("media_id").references(() => mediaObjects.id),
     extractionId: text("extraction_id").references(() => aiExtractions.id),

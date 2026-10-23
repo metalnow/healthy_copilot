@@ -29,6 +29,7 @@ export default async function EditFoodPage({ params }: PageProps<"/log/food/[id]
         defaults={{
           items: event.items.map((i) => ({ name: i.name, portion: i.portion ?? undefined, nutrition: i.nutrition ?? undefined })),
           note: event.note ?? undefined,
+          satiety: event.satiety ?? undefined,
         }}
       />
     </div>

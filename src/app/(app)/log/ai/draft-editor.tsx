@@ -10,6 +10,7 @@ import {
   EXERCISE_TYPE_LABELS,
   MEAL_TYPE_LABELS,
   OBSERVATION_LABELS,
+  SATIETY_LABELS,
   SEVERITY_LABELS,
   SYMPTOM_LABELS,
 } from "@/lib/labels";
@@ -184,6 +185,24 @@ function EventCard({
                 options={MEAL_TYPES.map((t) => ({ value: t, label: MEAL_TYPE_LABELS[t] }))}
               />
               <FoodItems items={event.items} onChange={(items) => update({ items })} />
+              <div className="space-y-2">
+                <span className="block text-sm text-muted">飽足感（選填）</span>
+                <ChipGroup
+                  name={`satiety-${event.key}`}
+                  label="飽足感"
+                  value={event.satiety ? String(event.satiety) : ""}
+                  onChange={(v) => update({ satiety: Number(v) })}
+                  options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: SATIETY_LABELS[n] }))}
+                />
+              </div>
+              <input
+                value={event.note ?? ""}
+                onChange={(e) => update({ note: e.target.value || undefined })}
+                placeholder="感受（選填），例如 吃完很撐、太油"
+                aria-label="對這餐的感受"
+                maxLength={500}
+                className={inputClass}
+              />
             </>
           )}
 

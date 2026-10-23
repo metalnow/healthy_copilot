@@ -26,6 +26,7 @@ const baseEvent: AiEvent = {
   localTime: null,
   confidence: 0.8,
   mealType: null,
+  satiety: null,
   items: [],
   drinkType: null,
   drinkName: null,
@@ -166,13 +167,13 @@ describe("draftFromTextParse：運動與症狀", () => {
 describe("draftFromFoodPhoto", () => {
   it("非食物照片回傳空陣列", () => {
     expect(
-      draftFromFoodPhoto({ isFood: false, mealType: null, items: [], drinks: [], overallConfidence: 0.9, notes: null }, now, TZ),
+      draftFromFoodPhoto({ isFood: false, mealType: null, items: [], drinks: [], overallConfidence: 0.9, satiety: null, feeling: null, notes: null }, now, TZ),
     ).toEqual([]);
   });
 
   it("照片轉成一筆飲食草稿", () => {
     const [draft] = draftFromFoodPhoto(
-      { isFood: true, mealType: "lunch", items: [item("滷雞腿", 300), item("  ")], drinks: [], overallConfidence: 1.2, notes: null },
+      { isFood: true, mealType: "lunch", items: [item("滷雞腿", 300), item("  ")], drinks: [], overallConfidence: 1.2, satiety: null, feeling: null, notes: null },
       now,
       TZ,
     );
@@ -194,7 +195,7 @@ describe("draftFromFoodPhoto", () => {
 
   it("飲料另外成為飲料草稿", () => {
     const drafts = draftFromFoodPhoto(
-      { isFood: true, mealType: "lunch", items: [item("排骨便當", 800)], drinks: [drink({})], overallConfidence: 0.9, notes: null },
+      { isFood: true, mealType: "lunch", items: [item("排骨便當", 800)], drinks: [drink({})], overallConfidence: 0.9, satiety: null, feeling: null, notes: null },
       now,
       TZ,
     );
@@ -213,9 +214,18 @@ describe("draftFromFoodPhoto", () => {
     });
   });
 
+  it("補充說明中的感受帶入飽足感與備註", () => {
+    const [draft] = draftFromFoodPhoto(
+      { isFood: true, mealType: "dinner", items: [item("牛肉麵", 650)], drinks: [], overallConfidence: 0.8, satiety: 5.4, feeling: " 吃完很撐 ", notes: null },
+      now,
+      TZ,
+    );
+    expect(draft).toMatchObject({ kind: "food", satiety: 5, note: "吃完很撐" });
+  });
+
   it("只有飲料時不產生飲食草稿；容量不明時用預設值並降低信心", () => {
     const drafts = draftFromFoodPhoto(
-      { isFood: true, mealType: null, items: [], drinks: [drink({ drinkType: "coffee", volumeMl: null })], overallConfidence: 0.9, notes: null },
+      { isFood: true, mealType: null, items: [], drinks: [drink({ drinkType: "coffee", volumeMl: null })], overallConfidence: 0.9, satiety: null, feeling: null, notes: null },
       now,
       TZ,
     );

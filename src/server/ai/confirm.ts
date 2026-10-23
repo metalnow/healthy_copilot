@@ -54,6 +54,8 @@ export async function confirmDraft(db: Db, user: SessionUser, draft: ConfirmDraf
         occurredAt,
         inputType,
         items: event.items,
+        satiety: event.satiety,
+        note: event.note || undefined,
         totalNutrition: sumNutrition(event.items),
         aiConfidence: event.confidence,
         mediaId,

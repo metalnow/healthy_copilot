@@ -7,6 +7,9 @@ import { toLocalTime } from "@/lib/time";
 export const STEP_GOAL = 8000;
 export const SLEEP_TARGET_MIN = 7 * 60;
 const LATE_DINNER = "20:00";
+/** 熱量與飽足感落差的門檻：熱量高卻不飽、熱量低卻很飽 */
+export const HIGH_KCAL_MEAL = 700;
+export const LOW_KCAL_MEAL = 400;
 
 export type AggregateInput = {
   timeZone: string;
@@ -24,7 +27,7 @@ export type AggregateInput = {
   }[];
   activity: { localDate: string; steps: number | null }[];
   exercise: { localDate: string; durationMin: number; afterMeal: boolean | null }[];
-  food: { localDate: string; occurredAt: string; mealType: string; kcal: number | null }[];
+  food: { localDate: string; occurredAt: string; mealType: string; kcal: number | null; satiety: number | null }[];
   drinks: {
     localDate: string;
     drinkType: string;
@@ -138,6 +141,8 @@ export function summarize(input: AggregateInput) {
     rows.reduce((s, r) => s + (r.kcal ?? 0), 0),
   );
 
+  const satietyMeals = input.food.filter((f): f is typeof f & { satiety: number } => f.satiety !== null);
+
   const waterByDay = [...byDate(input.drinks).values()].map((rows) => rows.reduce((s, r) => s + (r.waterMl ?? 0), 0));
   const alcoholDays = [...byDate(input.drinks.filter((d) => (d.alcoholG ?? 0) > 0)).keys()];
 
@@ -187,6 +192,11 @@ export function summarize(input: AggregateInput) {
       avgEstimatedKcalPerDay: kcalByDay.length ? Math.round(avg(kcalByDay)!) : null,
       avgDinnerTime: dinnerTimes.length ? formatMinutesOfDay(avg(dinnerTimes)!) : null,
       lateDinners: dinnerTimes.filter((m) => m >= minutesOfDay(LATE_DINNER)).length,
+      // 主觀飽足感 1–5，與熱量估算對照
+      satietyLogged: satietyMeals.length,
+      avgSatiety: satietyMeals.length ? round(avg(satietyMeals.map((f) => f.satiety))!) : null,
+      highKcalLowSatiety: satietyMeals.filter((f) => f.kcal !== null && f.kcal >= HIGH_KCAL_MEAL && f.satiety <= 2).length,
+      lowKcalHighSatiety: satietyMeals.filter((f) => f.kcal !== null && f.kcal <= LOW_KCAL_MEAL && f.satiety >= 4).length,
     },
     drinks: {
       avgWaterMlPerDay: waterByDay.length ? Math.round(avg(waterByDay)!) : null,
@@ -285,6 +295,24 @@ export function deterministicInsights(
       priority: 7,
       tone: current.activity.avgSteps >= STEP_GOAL ? "positive" : "neutral",
       text: `平均每天 ${current.activity.avgSteps.toLocaleString("zh-TW")} 步${change ? `（比前一期${change > 0 ? "多" : "少"} ${Math.abs(change).toLocaleString("zh-TW")} 步）` : ""}`,
+    });
+  }
+
+  if (current.food.highKcalLowSatiety > 0) {
+    insights.push({
+      id: "kcal_not_filling",
+      priority: 5,
+      tone: "attention",
+      text: `本期有 ${current.food.highKcalLowSatiety} 餐熱量估算 ≥ ${HIGH_KCAL_MEAL} kcal，吃完卻還覺得餓`,
+    });
+  }
+
+  if (current.food.lowKcalHighSatiety >= 2) {
+    insights.push({
+      id: "light_but_filling",
+      priority: 6,
+      tone: "positive",
+      text: `有 ${current.food.lowKcalHighSatiety} 餐熱量 ≤ ${LOW_KCAL_MEAL} kcal 卻很飽，可以多參考這些餐點`,
     });
   }
 

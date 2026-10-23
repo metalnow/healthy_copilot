@@ -28,6 +28,8 @@ export const DraftEventSchema = z.discriminatedUnion("kind", [
     mealType: z.enum(MEAL_TYPES),
     occurredAt: DateTimeLocal,
     items: z.array(DraftFoodItemSchema).min(1, "請至少保留一項食物").max(30),
+    satiety: z.number().int().min(1).max(5).optional(),
+    note: z.string().trim().max(500).optional(),
     confidence: Confidence.optional(),
   }),
   z.object({
@@ -178,6 +180,14 @@ function measurementValues(event: AiEvent): Record<string, number> | null {
   }
 }
 
+/** 飽足感限制在 1–5；感受文字最多 500 字 */
+function feelingFields(satiety: number | null, feeling: string | null) {
+  return {
+    satiety: satiety !== null ? Math.min(5, Math.max(1, Math.round(satiety))) : undefined,
+    note: feeling?.trim().slice(0, 500) || undefined,
+  };
+}
+
 const DEFAULT_DRINK_VOLUME_ML = 250;
 const nonNegative = (n: number | null) => (n != null && n >= 0 ? n : undefined);
 
@@ -211,6 +221,7 @@ export function draftFromTextParse(result: TextParseResult, now: Date, timeZone:
         mealType: event.mealType ?? guessMealType(occurredAt.slice(11)),
         occurredAt,
         items,
+        ...feelingFields(event.satiety, event.note),
         confidence,
       });
     } else if (event.kind === "drink") {
@@ -281,6 +292,7 @@ export function draftFromFoodPhoto(result: FoodPhotoResult, now: Date, timeZone:
       mealType: result.mealType ?? guessMealType(occurredAt.slice(11)),
       occurredAt,
       items,
+      ...feelingFields(result.satiety, result.feeling),
       confidence,
     });
   }
