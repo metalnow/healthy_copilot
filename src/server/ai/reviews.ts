@@ -6,7 +6,7 @@ import { reviewSystemPrompt } from "@/lib/ai/prompts";
 import { ReviewOutputSchema, type ReviewOutput } from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
 import { getGoalMetric, goalProgress } from "@/lib/goals";
-import { getLabDefinition } from "@/lib/labs/catalog";
+import { labDisplayName } from "@/lib/labs/catalog";
 import { MEAL_TYPE_LABELS, SATIETY_LABELS } from "@/lib/labels";
 import { monthBounds, weekBounds } from "@/lib/insights/periods";
 import { evaluateBloodPressure, evaluateSymptom } from "@/lib/safety/rules";
@@ -110,7 +110,7 @@ async function buildReviewInput(db: Db, user: { id: string; timezone: string }, 
     .filter(({ latest }) => latest.value !== null || latest.textValue)
     .slice(0, 30)
     .map(({ latest, previous: prev }) => ({
-      item: latest.code === "OTHER" ? latest.displayName : (getLabDefinition(latest.code)?.name ?? latest.code),
+      item: labDisplayName(latest),
       value: latest.value ?? latest.textValue,
       unit: latest.unit,
       date: latest.measuredAt,

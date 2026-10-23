@@ -62,7 +62,17 @@ export function labReportSystemPrompt(catalog: string) {
 - 數值放 value、單位照原文放 unit；陰性 / 陽性、效價、影像描述等放 textValue。
 - 參考範圍拆成 referenceMin / referenceMax（例如「70-100」），無法拆解時放 referenceText。
 - 報告有 H、L、*、↑、↓ 等標示時填 abnormalFlag，沒有標示填 null。
-- 超音波、心血管風險等描述性結果用一筆 ULTRASOUND / CV_RISK，textValue 放重點摘要（不超過 200 字）。
+- 報告用紅字、粗體或顏色標示異常而沒有符號時，依參考範圍判斷填 high / low。
+- 性別分開的參考值（例如「男:<90;女<80」）取與受檢者性別相符的範圍；無法判斷時放 referenceText。
+- 超音波、心血管風險等描述性結果，textValue 放重點摘要（不超過 200 字）。不同部位的超音波（腹部、甲狀腺、攝護腺…）各一筆 ULTRASOUND，displayName 寫部位，例如「腹部超音波」。
+- 過敏原檢測：每個過敏原（包含 FX5 食物混合、ex2 動物皮毛混合等混合過敏原）各一筆 IGE_SPECIFIC，
+  displayName 保留報告原文（含代碼，例如「e1 貓皮毛」），數值放 value、單位 kUA/L；「<0.35」這類結果放 textValue。
+  整份共用的分級對照表（RAST class）不是項目，不要輸出，也不要填進 referenceText。
+
+只擷取本次檢查的結果：
+- 報告並列「前次結果」「歷年結果」等欄位時，只取本次那一欄，其他欄位完全忽略。
+- 同一項目只輸出一次；「資料複製區域」這類把數值再列一次的區塊不要重複擷取。
+- 不要擷取問卷與文字段落：生活習慣、既往病史、作業經歷、自覺症狀、健康建議、醫師評語、提醒事項。
 - 不是健檢或檢驗報告時 isHealthReport 為 false、items 為空陣列。
 - 不要輸出任何個人身分資料（姓名、身分證號、病歷號、生日）。
 

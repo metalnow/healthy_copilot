@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import { labObservations } from "@/db/schema";
 import { LabExtractionSchema } from "@/lib/ai/schemas";
 import { requireUser } from "@/lib/auth/dal";
-import { getLabDefinition } from "@/lib/labs/catalog";
+import { labDisplayName } from "@/lib/labs/catalog";
 import { FLAG_CLASSES, FLAG_LABELS, formatLabValue, formatReference } from "@/lib/labs/format";
 import { labDraftFromExtraction } from "@/lib/labs/review";
 import { getExtraction } from "@/server/ai/extractions";
@@ -107,7 +107,7 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
               <li key={row.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                 <span className="min-w-0">
                   <span className="block">
-                    {row.code === "OTHER" ? row.displayName : (getLabDefinition(row.code)?.name ?? row.displayName)}
+                    {labDisplayName(row)}
                   </span>
                   <span className="text-xs text-muted">{formatReference(row) && `參考 ${formatReference(row)}`}</span>
                 </span>

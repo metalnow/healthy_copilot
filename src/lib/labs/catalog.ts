@@ -2,10 +2,11 @@
 
 export const LAB_CATEGORIES = {
   body: "身體量測",
+  blood: "血液常規",
   metabolic: "血糖代謝",
   lipid: "血脂",
   liver: "肝功能",
-  kidney: "腎功能 / 尿酸",
+  kidney: "腎功能 / 尿酸 / 電解質",
   tumor: "腫瘤標記",
   infection: "肝炎 / 感染",
   immune: "過敏 / 免疫",
@@ -27,9 +28,28 @@ export type LabDefinition = {
   conversions?: Record<string, Conversion>;
   /** 是否可設定為數值型健康目標 */
   goal?: boolean;
+  /** 同一代碼下有多個不同項目（例如各種過敏原、各部位超音波），依報告上的名稱分開保存與比較 */
+  byName?: boolean;
 };
 
 const factor = (f: number): Conversion => (v) => v * f;
+
+/** 血球計數的常見單位寫法（10³/µL = 10⁹/L = K/µL） */
+const COUNT_10_3: Record<string, Conversion> = {
+  "10^3/µl": factor(1),
+  "10^3/ul": factor(1),
+  "x10^3/µl": factor(1),
+  "10^9/l": factor(1),
+  "k/µl": factor(1),
+  "k/ul": factor(1),
+};
+const COUNT_10_6: Record<string, Conversion> = {
+  "10^6/µl": factor(1),
+  "10^6/ul": factor(1),
+  "x10^6/µl": factor(1),
+  "10^12/l": factor(1),
+  "m/µl": factor(1),
+};
 
 export const LAB_CATALOG: LabDefinition[] = [
   { code: "HEIGHT", name: "身高", category: "body", unit: "cm", aliases: ["身長", "height"], conversions: { m: factor(100) } },
@@ -39,7 +59,15 @@ export const LAB_CATALOG: LabDefinition[] = [
   { code: "SBP", name: "收縮壓", category: "body", unit: "mmHg", aliases: ["systolic", "血壓(收縮)"], goal: true },
   { code: "DBP", name: "舒張壓", category: "body", unit: "mmHg", aliases: ["diastolic", "血壓(舒張)"], goal: true },
   { code: "BODY_FAT", name: "體脂率", category: "body", unit: "%", aliases: ["體脂肪率", "body fat"], goal: true },
-  { code: "VISCERAL_FAT", name: "內臟脂肪", category: "body", unit: "level", aliases: ["內臟脂肪等級", "visceral fat"], goal: true },
+  { code: "VISCERAL_FAT", name: "內臟脂肪", category: "body", unit: "level", aliases: ["內臟脂肪等級", "內臟脂肪率", "visceral fat"], goal: true },
+  { code: "PULSE", name: "脈搏", category: "body", unit: "bpm", aliases: ["pulse", "心跳", "次/min"], conversions: { "次/min": factor(1), "/min": factor(1) } },
+
+  { code: "WBC", name: "白血球 WBC", category: "blood", unit: "10³/µL", aliases: ["wbc", "白血球總數"], conversions: COUNT_10_3 },
+  { code: "RBC", name: "紅血球 RBC", category: "blood", unit: "10⁶/µL", aliases: ["rbc", "紅血球總數"], conversions: COUNT_10_6 },
+  { code: "HB", name: "血色素 Hb", category: "blood", unit: "g/dL", aliases: ["hb", "hgb", "hemoglobin", "血紅素"], conversions: { "g/l": factor(0.1), "mmol/l": factor(1.611) } },
+  { code: "HCT", name: "血球容積比 Hct", category: "blood", unit: "%", aliases: ["hct", "紅血球容積比", "hematocrit"] },
+  { code: "MCV", name: "平均紅血球容積 MCV", category: "blood", unit: "fL", aliases: ["mcv", "平均血球容積"] },
+  { code: "PLT", name: "血小板 PLT", category: "blood", unit: "10³/µL", aliases: ["plt", "platelet", "血小板數"], conversions: COUNT_10_3 },
 
   { code: "GLU_AC", name: "空腹血糖", category: "metabolic", unit: "mg/dL", aliases: ["飯前血糖", "glucose ac", "fasting glucose", "fbs", "ac sugar"], conversions: { "mmol/l": factor(18.016) }, goal: true },
   {
@@ -60,10 +88,17 @@ export const LAB_CATALOG: LabDefinition[] = [
 
   { code: "AST", name: "GOT / AST", category: "liver", unit: "U/L", aliases: ["got", "sgot", "ast", "麩草酸轉胺酶"], conversions: { "iu/l": factor(1) }, goal: true },
   { code: "ALT", name: "GPT / ALT", category: "liver", unit: "U/L", aliases: ["gpt", "sgpt", "alt", "麩丙酮酸轉胺酶"], conversions: { "iu/l": factor(1) }, goal: true },
+  { code: "ALP", name: "鹼性磷酸酶 ALP", category: "liver", unit: "U/L", aliases: ["alk-p", "alp", "alkaline phosphatase", "鹼性磷酸脢"], conversions: { "iu/l": factor(1) } },
+  { code: "ALB", name: "白蛋白 Albumin", category: "liver", unit: "g/dL", aliases: ["albumin", "alb"], conversions: { "g/l": factor(0.1) } },
+  { code: "TBIL", name: "總膽紅素", category: "liver", unit: "mg/dL", aliases: ["t-bili", "t-bil", "total bilirubin", "總膽紅素"], conversions: { "µmol/l": factor(1 / 17.1) } },
   { code: "GGT", name: "γ-GT", category: "liver", unit: "U/L", aliases: ["r-gt", "γ-gt", "gamma-gt", "ggt", "丙麩胺酸轉移酶"], conversions: { "iu/l": factor(1) }, goal: true },
 
   { code: "CREA", name: "肌酸酐 Creatinine", category: "kidney", unit: "mg/dL", aliases: ["creatinine", "cre", "肌酸酐"], conversions: { "µmol/l": factor(1 / 88.4) }, goal: true },
   { code: "EGFR", name: "腎絲球過濾率 eGFR", category: "kidney", unit: "mL/min/1.73m²", aliases: ["egfr", "腎絲球過濾率"], goal: true },
+  { code: "BUN", name: "尿素氮 BUN", category: "kidney", unit: "mg/dL", aliases: ["bun", "尿素氮", "blood urea nitrogen"], conversions: { "mmol/l": factor(2.8) } },
+  { code: "NA", name: "鈉 Na", category: "kidney", unit: "mmol/L", aliases: ["sodium", "na", "鈉"], conversions: { "meq/l": factor(1) } },
+  { code: "K", name: "鉀 K", category: "kidney", unit: "mmol/L", aliases: ["potassium", "k", "鉀"], conversions: { "meq/l": factor(1) } },
+  { code: "CA", name: "鈣 Ca", category: "kidney", unit: "mg/dL", aliases: ["calcium", "ca", "鈣"], conversions: { "mmol/l": factor(4.008) } },
   { code: "UA", name: "尿酸", category: "kidney", unit: "mg/dL", aliases: ["uric acid", "ua"], conversions: { "µmol/l": factor(1 / 59.48) }, goal: true },
 
   { code: "PSA", name: "攝護腺特異抗原 PSA", category: "tumor", unit: "ng/mL", aliases: ["psa", "攝護腺特異抗原"], conversions: { "µg/l": factor(1) } },
@@ -73,16 +108,28 @@ export const LAB_CATALOG: LabDefinition[] = [
   { code: "HBSAG", name: "B 型肝炎表面抗原 HBsAg", category: "infection", unit: null, aliases: ["hbsag", "b肝表面抗原"] },
   { code: "ANTI_HBS", name: "B 型肝炎表面抗體 Anti-HBs", category: "infection", unit: "mIU/mL", aliases: ["anti-hbs", "b肝表面抗體"], conversions: { "iu/l": factor(1) } },
   { code: "ANTI_HBC", name: "B 型肝炎核心抗體 Anti-HBc", category: "infection", unit: null, aliases: ["anti-hbc"] },
+  { code: "ANTI_HAV", name: "A 型肝炎抗體 Anti-HAV IgG", category: "infection", unit: null, aliases: ["hav-igg", "anti-hav", "a肝抗體"] },
   { code: "ANTI_HCV", name: "C 型肝炎抗體 Anti-HCV", category: "infection", unit: null, aliases: ["anti-hcv", "c肝抗體"] },
 
   { code: "IGE_TOTAL", name: "總 IgE", category: "immune", unit: "IU/mL", aliases: ["total ige", "ige", "免疫球蛋白e"], conversions: { "ku/l": factor(1) } },
-  { code: "IGE_SPECIFIC", name: "過敏原特異性 IgE", category: "immune", unit: null, aliases: ["specific ige", "過敏原"] },
+  {
+    code: "IGE_SPECIFIC",
+    name: "過敏原特異性 IgE",
+    category: "immune",
+    unit: "kUA/L",
+    aliases: ["specific ige", "過敏原", "rast", "mast", "allergen ige"],
+    conversions: { "ku/l": factor(1), "kiu/l": factor(1), "iu/ml": factor(1) },
+    byName: true,
+  },
   { code: "ANA", name: "抗核抗體 ANA", category: "immune", unit: null, aliases: ["ana", "抗核抗體"] },
 
   { code: "CV_RISK", name: "心血管風險評估", category: "imaging", unit: null, aliases: ["心血管風險", "framingham", "10年心血管風險"] },
-  { code: "ULTRASOUND", name: "超音波檢查", category: "imaging", unit: null, aliases: ["腹部超音波", "ultrasound", "超音波"] },
+  { code: "LDH", name: "乳酸脫氫酶 LDH", category: "other", unit: "U/L", aliases: ["ldh", "乳酸脫氫脢"], conversions: { "iu/l": factor(1) } },
+  { code: "CPK", name: "肌酸激酶 CPK", category: "other", unit: "U/L", aliases: ["cpk", "ck", "肌酸激脢"], conversions: { "iu/l": factor(1) } },
+  { code: "BMD_T", name: "骨密度 T 值", category: "imaging", unit: null, aliases: ["骨質密度", "bone density", "t-score", "骨密度"] },
+  { code: "ULTRASOUND", name: "超音波檢查", category: "imaging", unit: null, aliases: ["腹部超音波", "ultrasound", "超音波"], byName: true },
 
-  { code: "OTHER", name: "其他項目", category: "other", unit: null, aliases: [] },
+  { code: "OTHER", name: "其他項目", category: "other", unit: null, aliases: [], byName: true },
 ];
 
 export const LAB_CODES = LAB_CATALOG.map((d) => d.code) as [string, ...string[]];
@@ -91,6 +138,28 @@ const BY_CODE = new Map(LAB_CATALOG.map((d) => [d.code, d]));
 
 export function getLabDefinition(code: string): LabDefinition | undefined {
   return BY_CODE.get(code);
+}
+
+export function isGroupedByName(code: string) {
+  return BY_CODE.get(code)?.byName ?? false;
+}
+
+/** 畫面上的項目名稱：依名稱分組的項目用報告原文，其他用代碼表名稱 */
+export function labDisplayName(row: { code: string; displayName: string }) {
+  return isGroupedByName(row.code) ? row.displayName : (BY_CODE.get(row.code)?.name ?? row.displayName);
+}
+
+// ─── 過敏原特異性 IgE（RAST / ImmunoCAP 分級） ───────────────
+
+/** ≥ 0.35 kUA/L 視為陽性 */
+export const IGE_POSITIVE = 0.35;
+const RAST_THRESHOLDS = [0.35, 0.7, 3.5, 17.5, 50, 100];
+const RAST_LABELS = ["無過敏反應", "低程度", "中等程度", "中高程度", "高程度", "極高程度", "最高程度"];
+
+/** kUA/L → 分級 0–6 */
+export function rastClass(value: number): { level: number; label: string } {
+  const level = RAST_THRESHOLDS.filter((t) => value >= t).length;
+  return { level, label: RAST_LABELS[level] };
 }
 
 /** 單位字串正規化：大小寫、µ / u、空白、上標 */
@@ -120,6 +189,18 @@ export function toCanonicalUnit(
   const convert = def.conversions?.[normalized];
   if (!convert) return { value, unit, converted: false };
   return { value: Math.round(convert(value) * 100) / 100, unit: def.unit, converted: true };
+}
+
+/** 報告未標示且沒有逐項參考範圍時的預設判斷（目前只有過敏原 IgE 有固定的陽性門檻） */
+export function defaultFlag(
+  code: string,
+  value: number | null,
+  textValue: string | null,
+): "high" | "normal" | null {
+  if (code !== "IGE_SPECIFIC") return null;
+  if (value !== null) return value >= IGE_POSITIVE ? "high" : "normal";
+  if (textValue && /^\s*<\s*0?\.35/.test(textValue)) return "normal";
+  return null;
 }
 
 /** 依參考範圍判斷高低（報告未標示時使用） */

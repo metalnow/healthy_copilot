@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drinkEvents, foodEvents, foodItems, labObservations, medicationEvents, medications, observations } from "@/db/schema";
-import { getLabDefinition } from "@/lib/labs/catalog";
+import { labDisplayName } from "@/lib/labs/catalog";
 import { formatLabValue } from "@/lib/labs/format";
 import { formatMl, formatObservation } from "@/lib/format";
 import {
@@ -252,7 +252,7 @@ export async function getTimeline(
       localDate: l.measuredAt,
       occurredAt: null,
       time: null,
-      title: l.code === "OTHER" ? l.displayName : (getLabDefinition(l.code)?.name ?? l.displayName),
+      title: labDisplayName(l),
       detail: formatLabValue(l),
       ai: l.source === "ai_extract",
     })),

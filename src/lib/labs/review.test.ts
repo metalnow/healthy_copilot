@@ -37,6 +37,20 @@ describe("lab review", () => {
     ).toMatchObject({ value: 193.08, unit: "mg/dL", referenceMax: 150.57, abnormalFlag: "high" });
   });
 
+  it("過敏原 IgE 依 0.35 判斷陽性，報告有標示時以報告為準", () => {
+    expect(toLabObservationValues({ code: "IGE_SPECIFIC", displayName: "d1 屋塵蟎", value: 19.2, unit: "KUA/l" })).toMatchObject({
+      value: 19.2,
+      unit: "kUA/L",
+      abnormalFlag: "high",
+    });
+    expect(toLabObservationValues({ code: "IGE_SPECIFIC", displayName: "f1 蛋白", textValue: "<0.35" })).toMatchObject({
+      abnormalFlag: "normal",
+    });
+    expect(
+      toLabObservationValues({ code: "IGE_SPECIFIC", displayName: "x", value: 0.5, unit: "kUA/L", referenceMax: 0.7 }),
+    ).toMatchObject({ abnormalFlag: "normal" });
+  });
+
   it("報告有標示時以報告為準；質性結果保留單位為空", () => {
     expect(
       toLabObservationValues({ code: "HDL", displayName: "HDL", value: 33, unit: "mg/dL", abnormalFlag: "low" }),

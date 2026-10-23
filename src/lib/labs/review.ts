@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ABNORMAL_FLAGS } from "@/lib/enums";
 import type { LabExtraction } from "@/lib/ai/schemas";
-import { flagFromReference, getLabDefinition, LAB_CODES, toCanonicalUnit } from "./catalog";
+import { defaultFlag, flagFromReference, getLabDefinition, LAB_CODES, toCanonicalUnit } from "./catalog";
 
 const optionalNumber = z.number().finite().optional();
 
@@ -95,7 +95,10 @@ export function toLabObservationValues(item: LabDraftItem): LabObservationValues
     referenceMin,
     referenceMax,
     referenceText: item.referenceText ?? null,
-    abnormalFlag: item.abnormalFlag ?? flagFromReference(value, referenceMin, referenceMax),
+    abnormalFlag:
+      item.abnormalFlag ??
+      (referenceMin === null && referenceMax === null ? defaultFlag(item.code, value, item.textValue ?? null) : null) ??
+      flagFromReference(value, referenceMin, referenceMax),
     sourcePage: item.page ?? null,
     confidence: item.confidence ?? null,
   };

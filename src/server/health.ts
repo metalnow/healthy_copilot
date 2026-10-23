@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
 import { goalDirection } from "@/lib/goals";
+import { isGroupedByName } from "@/lib/labs/catalog";
 import { toLabObservationValues, type ConfirmLabs, type LabDraftItem } from "@/lib/labs/review";
 import { sleepDurationMin } from "@/lib/sleep";
 import { toLocalDate } from "@/lib/time";
@@ -118,9 +119,9 @@ export async function deleteLab(db: Db, userId: string, id: string) {
   return deleted.length > 0;
 }
 
-/** 檢驗項目的分組 key：OTHER 依名稱區分 */
+/** 檢驗項目的分組 key：OTHER、過敏原、超音波等依名稱區分 */
 export function labKey(row: Pick<LabRow, "code" | "displayName">) {
-  return row.code === "OTHER" ? `OTHER:${row.displayName}` : row.code;
+  return isGroupedByName(row.code) ? `${row.code}:${row.displayName}` : row.code;
 }
 
 export async function listLabs(db: Db, userId: string) {
@@ -156,7 +157,7 @@ export async function labHistory(db: Db, userId: string, key: string) {
       and(
         eq(labObservations.userId, userId),
         eq(labObservations.code, code),
-        ...(code === "OTHER" ? [eq(labObservations.displayName, name)] : []),
+        ...(isGroupedByName(code) ? [eq(labObservations.displayName, name)] : []),
       ),
     )
     .orderBy(asc(labObservations.measuredAt));

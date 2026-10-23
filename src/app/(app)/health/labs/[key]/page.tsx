@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { TrendChart } from "@/components/trend-chart";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
-import { getLabDefinition } from "@/lib/labs/catalog";
+import { labDisplayName } from "@/lib/labs/catalog";
 import { FLAG_CLASSES, FLAG_LABELS, formatLabValue, formatReference } from "@/lib/labs/format";
 import { labHistory } from "@/server/health";
 import { removeLab } from "../../actions";
@@ -29,7 +29,7 @@ export default async function LabHistoryPage({ params }: PageProps<"/health/labs
         .map((r) => [r.measuredAt, { date: r.measuredAt, value: r.value! }]),
     ).values(),
   ];
-  const name = latest.code === "OTHER" ? latest.displayName : (getLabDefinition(latest.code)?.name ?? latest.displayName);
+  const name = labDisplayName(latest);
 
   return (
     <div className="space-y-6">

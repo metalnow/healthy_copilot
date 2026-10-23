@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
-import { getLabDefinition, LAB_CATEGORIES, type LabCategory } from "@/lib/labs/catalog";
+import { getLabDefinition, LAB_CATEGORIES, labDisplayName, type LabCategory } from "@/lib/labs/catalog";
 import { FLAG_CLASSES, FLAG_LABELS, formatLabValue } from "@/lib/labs/format";
 import { getHealthProfile, listGoals, listHealthDocuments, listLabs, summarizeLabs } from "@/server/health";
 
@@ -129,7 +129,7 @@ export default async function HealthPage() {
                       >
                         <span className="min-w-0">
                           <span className="block text-sm">
-                            {latest.code === "OTHER" ? latest.displayName : (getLabDefinition(latest.code)?.name ?? latest.displayName)}
+                            {labDisplayName(latest)}
                           </span>
                           <span className="text-xs text-muted">
                             {latest.measuredAt}
