@@ -14,4 +14,9 @@ export const DOCUMENT_ERROR_MESSAGES: Record<string, string> = {
   invalid_output: "AI 無法解析這份報告，可以重試或改用較清晰的檔案",
   insufficient_credits: "OpenRouter 額度不足",
   auth: "OpenRouter API Key 無效",
+  timeout: "AI 處理逾時，請按「重新辨識」再試一次",
+  provider_error: "AI 服務暫時無法使用，請稍後按「重新辨識」",
+  rate_limited: "AI 請求過於頻繁，請稍後再試",
+  bad_request: "AI 無法處理這份檔案的格式",
+  unexpected: "發生未預期的錯誤",
 };

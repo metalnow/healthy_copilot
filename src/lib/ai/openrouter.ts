@@ -10,6 +10,8 @@ export type OpenRouterConfig = {
   apiKey: string;
   baseUrl?: string;
   fetch?: typeof fetch;
+  /** 單次請求的逾時（預設 60 秒）；健檢報告等長輸出可放寬 */
+  timeoutMs?: number;
 };
 
 export type AiErrorCode =
@@ -89,7 +91,7 @@ async function post<T>(config: OpenRouterConfig, path: string, body: unknown): P
         "X-Title": "Healthy Copilot",
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(config.timeoutMs ?? REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {

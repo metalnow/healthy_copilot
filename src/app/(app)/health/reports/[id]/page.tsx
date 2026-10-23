@@ -69,7 +69,10 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
 
       {doc.status === "failed" && (
         <div className="space-y-3 rounded-xl border border-warning/40 p-4 text-sm">
-          <p className="text-warning">{DOCUMENT_ERROR_MESSAGES[doc.error ?? ""] ?? "辨識失敗，請稍後再試。"}</p>
+          <p className="text-warning">
+            {DOCUMENT_ERROR_MESSAGES[doc.error ?? ""] ?? "辨識失敗，請稍後再試。"}
+            {doc.error && <span className="ml-1 text-xs text-muted">（錯誤代碼：{doc.error}）</span>}
+          </p>
           <form action={retryReport}>
             <input type="hidden" name="id" value={doc.id} />
             <button type="submit" className="rounded-lg bg-accent px-3 py-2 text-accent-foreground">
