@@ -1,12 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { healthDocuments, mediaObjects } from "@/db/schema";
+import { healthDocuments, mediaObjects, users } from "@/db/schema";
 import { toBase64 } from "@/lib/crypto";
 import { AiError, NATIVE_PDF_PLUGIN, type ContentPart } from "@/lib/ai/openrouter";
 import { labReportSystemPrompt } from "@/lib/ai/prompts";
 import { LabExtractionSchema } from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
 import { catalogForPrompt } from "@/lib/labs/catalog";
+import { redactIdentity } from "@/lib/privacy/redact";
 import type { JobMessage } from "@/jobs/types";
 import { putMedia } from "@/server/media";
 import { completeExtraction, createExtraction, failExtraction, isOverHourlyLimit } from "./extractions";
@@ -22,7 +23,8 @@ export async function createHealthReport(
   db: Db,
   env: Env,
   userId: string,
-  input: { files: ReportFile[]; title?: string },
+  /** text：文字型 PDF 在瀏覽器抽出、已移除身分資料的文字 */
+  input: { files: ReportFile[]; title?: string; text?: string },
 ) {
   const config = openRouterConfig(env);
   if (!config.apiKey) throw new AiError("not_configured");
@@ -32,6 +34,14 @@ export async function createHealthReport(
   for (const file of input.files) {
     mediaIds.push(await putMedia(db, env.MEDIA, userId, { kind: "health_report", ...file }));
   }
+  const textMediaId = input.text
+    ? await putMedia(db, env.MEDIA, userId, {
+        kind: "health_report",
+        bytes: new TextEncoder().encode(input.text) as Uint8Array<ArrayBuffer>,
+        mimeType: "text/plain; charset=utf-8",
+        filename: "report.txt",
+      })
+    : undefined;
   const profile = await getModelProfile(db, "vision");
   const extractionId = await createExtraction(db, {
     userId,
@@ -47,6 +57,7 @@ export async function createHealthReport(
       userId,
       mediaId: mediaIds[0],
       pageMediaIds: mediaIds,
+      textMediaId,
       pageCount: isPdf ? null : mediaIds.length,
       title: input.title,
       status: "extracting",
@@ -81,18 +92,25 @@ export async function runReportExtraction(
 
   const started = Date.now();
   try {
-    const ids = doc.pageMediaIds?.length ? doc.pageMediaIds : [doc.mediaId];
+    const parts: ContentPart[] = [{ type: "text", text: "請擷取這份報告中的所有檢驗與量測結果。" }];
+    let hasPdf = false;
+    // 文字型 PDF 只送文字（伺服器端再移除一次身分資料）；掃描檔與照片送圖片（使用者上傳前已塗黑身分欄位）
+    const ids = doc.textMediaId ? [doc.textMediaId] : doc.pageMediaIds?.length ? doc.pageMediaIds : [doc.mediaId];
     const media = await db
       .select()
       .from(mediaObjects)
       .where(and(inArray(mediaObjects.id, ids), eq(mediaObjects.userId, job.userId)));
 
-    const parts: ContentPart[] = [{ type: "text", text: "請擷取這份報告中的所有檢驗與量測結果。" }];
-    let hasPdf = false;
+    const [owner] = await db.select({ name: users.name }).from(users).where(eq(users.id, job.userId)).limit(1);
     for (const id of ids) {
       const row = media.find((m) => m.id === id);
       const object = row && (await env.MEDIA.get(row.r2Key));
       if (!row || !object) throw new AiError("bad_request", "Report file missing");
+      if (row.mimeType.startsWith("text/plain")) {
+        const { text } = redactIdentity(await object.text(), { names: [owner?.name] });
+        parts.push({ type: "text", text: `報告文字（由 PDF 抽出，身分資料已移除）：\n${text}` });
+        continue;
+      }
       const base64 = toBase64(new Uint8Array(await object.arrayBuffer()));
       if (row.mimeType === "application/pdf") {
         hasPdf = true;

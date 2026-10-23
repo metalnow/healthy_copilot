@@ -74,6 +74,14 @@ src/server/ai/tasks.ts
 模型依用途（`fast`、`vision`、`asr`、`reasoning`、`medical_summary`）設定，預設值在
 `src/lib/ai/model-profiles.ts`，可在「設定 → AI 模型」覆寫（存於 `model_profiles`）。
 
+### 身分資料不送給 AI
+
+健檢報告、藥袋等文件常印有姓名、生日、身分證、病歷號，送出前先在瀏覽器處理：
+
+- 文字型 PDF：pdf.js 抽出文字，`src/lib/privacy/redact.ts` 移除身分欄位後連同原檔上傳；
+  佇列處理時伺服器再移除一次，只把文字送給模型（原始 PDF 不送出）。
+- 照片與掃描型 PDF（轉成圖片）：使用者在 `ImageMasker` 塗黑表頭、頁尾等區域，上傳與保存的都是塗黑後的圖片。
+
 ## 加密
 
 - `MASTER_ENCRYPTION_KEY`（Worker secret）只用來包裝每位使用者的 DEK。

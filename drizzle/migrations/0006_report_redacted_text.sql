@@ -1,0 +1,1 @@
+ALTER TABLE `health_documents` ADD `text_media_id` text REFERENCES media_objects(id);

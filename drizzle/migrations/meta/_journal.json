@@ -43,6 +43,13 @@
       "when": 1792734943635,
       "tag": "0005_food_satiety",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792738277976,
+      "tag": "0006_report_redacted_text",
+      "breakpoints": true
     }
   ]
 }

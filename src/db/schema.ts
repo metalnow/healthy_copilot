@@ -244,6 +244,8 @@ export const healthDocuments = sqliteTable(
     pageCount: integer("page_count"),
     /** 多張圖片組成的報告：依頁序排列的 media id（第一頁同 media_id） */
     pageMediaIds: jsonText<string[]>("page_media_ids"),
+    /** 文字型 PDF：在瀏覽器抽出並移除身分資料後的文字；有值時只把這份文字送給 AI */
+    textMediaId: text("text_media_id").references(() => mediaObjects.id),
     status: text("status", { enum: HEALTH_DOCUMENT_STATUSES }).notNull().default("uploaded"),
     extractionId: text("extraction_id").references(() => aiExtractions.id),
     /** 擷取失敗的錯誤代碼（不含健康內容） */

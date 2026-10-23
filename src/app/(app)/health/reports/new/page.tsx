@@ -7,12 +7,12 @@ import { UploadForm } from "./upload-form";
 export const metadata: Metadata = { title: "上傳健檢報告" };
 
 export default async function NewReportPage() {
-  await requireUser();
+  const user = await requireUser();
   const env = await getEnv();
   return (
     <div className="space-y-6">
       <PageHeader title="上傳健檢報告" backHref="/health/reports" backLabel="健檢報告" />
-      <UploadForm configured={Boolean(env.OPENROUTER_API_KEY)} />
+      <UploadForm configured={Boolean(env.OPENROUTER_API_KEY)} ownerNames={user.name ? [user.name] : []} />
     </div>
   );
 }

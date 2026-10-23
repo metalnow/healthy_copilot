@@ -3,6 +3,7 @@
 import { Camera } from "lucide-react";
 import { useActionState, useState } from "react";
 import { ChipGroup, Field, FormError, inputClass, SubmitButton } from "@/components/form";
+import { applyMasks, ImageMasker, type MaskedPage } from "@/components/image-masker";
 import { LOW_CONFIDENCE } from "@/lib/ai/draft";
 import { MEDICATION_CATEGORIES, MEDICATION_TIMINGS } from "@/lib/enums";
 import type { ActionState } from "@/lib/form";
@@ -46,13 +47,22 @@ export function MedicationForm({ action, defaults: initial, aiImport }: Props) {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string>();
 
-  const importPhoto = async (file: File | undefined) => {
+  // 選好照片後先讓使用者塗黑藥袋上的姓名、病歷號，再送 AI
+  const [photo, setPhoto] = useState<MaskedPage>();
+  const choosePhoto = async (file: File | undefined) => {
     if (!file) return;
+    setImportError(undefined);
+    const resized = new File([await resizeImage(file, 2000, 0.9)], "medication.jpg", { type: "image/jpeg" });
+    setPhoto({ file: resized, url: URL.createObjectURL(resized), masks: [] });
+  };
+
+  const importPhoto = async () => {
+    if (!photo) return;
     setImporting(true);
     setImportError(undefined);
     try {
       const form = new FormData();
-      form.set("photo", new File([await resizeImage(file, 2000, 0.9)], "medication.jpg", { type: "image/jpeg" }));
+      form.set("photo", await applyMasks(photo.file, photo.masks));
       const response = await fetch("/api/ai/medication-photo", { method: "POST", body: form });
       const json = (await response.json().catch(() => null)) as (AiTaskResult & { error?: string }) | null;
       if (!response.ok || !json) throw new Error(json?.error ?? "照片辨識失敗");
@@ -69,6 +79,7 @@ export function MedicationForm({ action, defaults: initial, aiImport }: Props) {
       });
       setTimes(toTimeRows(draft.times));
       setImported({ extractionId: json.extractionId, confidence: json.confidence, notes: json.notes });
+      setPhoto(undefined);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : "照片辨識失敗");
     } finally {
@@ -84,15 +95,28 @@ export function MedicationForm({ action, defaults: initial, aiImport }: Props) {
       {aiImport && (
         <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface px-4 py-4 text-sm transition active:scale-[0.98] has-disabled:opacity-60">
           <Camera aria-hidden className="size-5 text-accent" />
-          {importing ? "AI 讀取中…" : "拍照或選擇包裝、藥袋照片"}
+          {photo ? "重新拍攝或選擇" : "拍照或選擇包裝、藥袋照片"}
           <input
             type="file"
             accept="image/*"
             disabled={importing}
-            onChange={(e) => importPhoto(e.target.files?.[0])}
+            onChange={(e) => choosePhoto(e.target.files?.[0])}
             className="sr-only"
           />
         </label>
+      )}
+      {photo && (
+        <div className="space-y-3">
+          <ImageMasker pages={[photo]} onChange={([page]) => setPhoto(page)} />
+          <button
+            type="button"
+            onClick={importPhoto}
+            disabled={importing}
+            className="w-full rounded-xl bg-accent px-4 py-3 font-medium text-accent-foreground transition active:scale-[0.98] disabled:opacity-60"
+          >
+            {importing ? "AI 讀取中…" : "AI 辨識"}
+          </button>
+        </div>
       )}
       {imported && (
         <p className={`text-sm ${lowConfidence ? "text-warning" : "text-muted"}`}>

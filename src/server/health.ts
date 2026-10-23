@@ -86,7 +86,15 @@ export async function confirmLabReport(db: Db, user: SessionUser, input: Confirm
 export async function deleteHealthDocument(db: Db, bucket: R2Bucket, userId: string, id: string) {
   const doc = await getHealthDocument(db, userId, id);
   if (!doc) return false;
-  const media = await documentMedia(db, userId, doc);
+  const pages = await documentMedia(db, userId, doc);
+  // 抽出的報告文字不算頁面，另外一起刪除
+  const text = doc.textMediaId
+    ? await db
+        .select()
+        .from(mediaObjects)
+        .where(and(eq(mediaObjects.id, doc.textMediaId), eq(mediaObjects.userId, userId)))
+    : [];
+  const media = [...pages, ...text];
   await db.batch([
     db.delete(labObservations).where(and(eq(labObservations.sourceDocumentId, id), eq(labObservations.userId, userId))),
     db.delete(healthDocuments).where(eq(healthDocuments.id, id)),

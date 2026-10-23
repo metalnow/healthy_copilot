@@ -10,6 +10,7 @@ const MAX_PDF_BYTES = 15 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGES = 12;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_TEXT_CHARS = 400_000;
 
 export async function POST(request: NextRequest) {
   if (!isSameOrigin(request)) return jsonError("不允許的來源", 403);
@@ -19,13 +20,17 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
   const title = String(form.get("title") ?? "").trim().slice(0, 100) || undefined;
+  const rawText = form.get("text");
+  const text = typeof rawText === "string" && rawText.trim() ? rawText : undefined;
 
   if (files.length === 0) return jsonError("請選擇報告檔案", 400);
   const pdfs = files.filter((f) => f.type === "application/pdf");
   if (pdfs.length > 0) {
     if (files.length > 1) return jsonError("PDF 一次只能上傳一份", 400);
     if (pdfs[0].size > MAX_PDF_BYTES) return jsonError("PDF 太大（上限 15 MB）", 413);
+    if (text && text.length > MAX_TEXT_CHARS) return jsonError("報告文字過長", 413);
   } else {
+    if (text) return jsonError("只有 PDF 可以附上抽出的文字", 400);
     if (files.length > MAX_IMAGES) return jsonError(`圖片最多 ${MAX_IMAGES} 張`, 400);
     if (files.some((f) => !IMAGE_TYPES.has(f.type))) return jsonError("只支援 PDF、JPEG、PNG、WebP", 415);
     if (files.some((f) => f.size > MAX_IMAGE_BYTES)) return jsonError("單張圖片上限 5 MB", 413);
@@ -35,6 +40,7 @@ export async function POST(request: NextRequest) {
   try {
     const documentId = await createHealthReport(db, await getEnv(), user.id, {
       title,
+      text,
       files: await Promise.all(
         files.map(async (f) => ({ bytes: new Uint8Array(await f.arrayBuffer()), mimeType: f.type, filename: f.name })),
       ),
