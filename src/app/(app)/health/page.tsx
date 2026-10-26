@@ -4,7 +4,7 @@ import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { getLabDefinition, LAB_CATEGORIES, labDisplayName, type LabCategory } from "@/lib/labs/catalog";
 import { FLAG_CLASSES, FLAG_LABELS, formatLabValue } from "@/lib/labs/format";
-import { getHealthProfile, listGoals, listHealthDocuments, listLabs, summarizeLabs } from "@/server/health";
+import { getHealthProfile, goalSuggestions, listGoals, listHealthDocuments, listLabs, summarizeLabs } from "@/server/health";
 
 export const metadata: Metadata = { title: "健康" };
 
@@ -35,12 +35,14 @@ function Trend({ latest, previous }: { latest: number | null; previous: number |
 export default async function HealthPage() {
   const user = await requireUser();
   const db = await getDb();
-  const [profile, labs, documents, goals] = await Promise.all([
+  const [profile, labs, documents, goals, suggestions] = await Promise.all([
     getHealthProfile(db, user.id),
     listLabs(db, user.id),
     listHealthDocuments(db, user.id),
     listGoals(db, user.id),
+    goalSuggestions(db, user),
   ]);
+  const suggestionCount = suggestions.length;
 
   const summaries = summarizeLabs(labs);
   const byCategory = new Map<LabCategory, typeof summaries>();
@@ -101,6 +103,11 @@ export default async function HealthPage() {
         }
       >
         <p className="text-sm text-muted">{activeGoals ? `進行中 ${activeGoals} 個目標` : "尚未設定目標。"}</p>
+        {suggestionCount > 0 && (
+          <Link href="/health/goals" className="mt-2 block text-sm text-accent">
+            依健檢報告有 {suggestionCount} 個建議目標 ›
+          </Link>
+        )}
       </Card>
 
       <section className="space-y-3">

@@ -181,6 +181,13 @@ export async function saveGoal(_prev: ActionState, formData: FormData): Promise<
   redirect("/health/goals");
 }
 
+/** 採用建議目標：沿用新增目標的驗證與寫入 */
+export async function adoptGoal(formData: FormData) {
+  const result = await saveGoal({}, formData);
+  // 驗證失敗（例如建議已過期）時回到目標頁
+  if (result.fieldErrors || result.error) redirect("/health/goals");
+}
+
 export async function updateGoal(formData: FormData) {
   const user = await requireUser();
   const id = formString(formData, "id");

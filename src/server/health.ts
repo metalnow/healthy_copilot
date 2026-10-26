@@ -13,6 +13,7 @@ import {
   sleepSessions,
 } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
+import { suggestGoals } from "@/lib/goal-suggestions";
 import { goalDirection } from "@/lib/goals";
 import { isGroupedByName } from "@/lib/labs/catalog";
 import { toLabObservationValues, type ConfirmLabs, type LabDraftItem } from "@/lib/labs/review";
@@ -293,4 +294,21 @@ export async function currentMetricValue(
   if (!fromObs) return fromLab;
   if (!fromLab) return fromObs;
   return fromObs.date >= fromLab.date ? fromObs : fromLab;
+}
+
+/** 依健檢報告產生建議目標（已有進行中目標的指標除外） */
+export async function goalSuggestions(db: Db, user: Pick<SessionUser, "id" | "timezone">) {
+  const [labs, profile, goals] = await Promise.all([listLabs(db, user.id), getHealthProfile(db, user.id), listGoals(db, user.id)]);
+  // 每天可以自己量的項目以最新的量測為基準
+  const daily = await Promise.all(
+    ["WEIGHT", "WAIST", "SBP", "DBP"].map(async (code) => [code, (await currentMetricValue(db, user, code))?.value] as const),
+  );
+  const latestHeight = labs.find((l) => l.code === "HEIGHT" && l.value !== null)?.value ?? null;
+  return suggestGoals({
+    labs,
+    current: Object.fromEntries(daily),
+    profile: { sex: profile?.sex ?? null, heightCm: profile?.heightCm ?? latestHeight },
+    activeMetrics: new Set(goals.filter((g) => g.status === "active").map((g) => g.metric)),
+    today: toLocalDate(new Date(), user.timezone),
+  });
 }
