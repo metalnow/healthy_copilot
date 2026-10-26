@@ -38,6 +38,7 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
   const [photo, setPhoto] = useState<Blob>();
   const [photoNote, setPhotoNote] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const run = useCallback(async (label: string, task: () => Promise<AiTaskResult>) => {
     setError(undefined);
@@ -94,6 +95,7 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
     setPhoto(undefined);
     setPhotoNote("");
     if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
   };
 
   if (!configured) {
@@ -147,27 +149,35 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
             // eslint-disable-next-line @next/next/no-img-element -- 本機 blob 預覽，不經過 next/image
             <img src={preview} alt="選擇的照片" className="max-h-56 w-full rounded-xl object-cover" />
           )}
-          <label
-            className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface px-4 text-center ${photo ? "py-3" : "py-10"}`}
-          >
-            {photo ? (
-              <span className="text-sm text-accent">重新拍攝或選擇</span>
-            ) : (
-              <>
-                <span className="text-3xl">📷</span>
-                <span className="font-medium">拍攝或選擇餐點、飲料照片</span>
-                <span className="text-xs text-muted">AI 會分開辨識食物與飲料，並估算份量與營養</span>
-              </>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => onPhoto(e.target.files?.[0])}
-              className="sr-only"
-            />
-          </label>
+          {!photo && (
+            <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-dashed border-border bg-surface px-4 pt-6 pb-4 text-center">
+              <span className="text-3xl">📷</span>
+              <span className="font-medium">餐點、飲料照片</span>
+              <span className="text-xs text-muted">AI 會分開辨識食物與飲料，並估算份量與營養</span>
+            </div>
+          )}
+          {/* 有 capture 的 input 在 Android 只會開相機，所以拍照與相簿分成兩個按鈕 */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: photo ? "重新拍照" : "拍照", capture: true },
+              { label: photo ? "改選相簿照片" : "從相簿選擇", capture: false },
+            ].map((option) => (
+              <label
+                key={option.label}
+                className="flex cursor-pointer items-center justify-center rounded-xl border border-border bg-surface px-3 py-3 text-sm font-medium text-accent active:scale-[0.98]"
+              >
+                {option.label}
+                <input
+                  ref={option.capture ? cameraRef : fileRef}
+                  type="file"
+                  accept="image/*"
+                  capture={option.capture ? "environment" : undefined}
+                  onChange={(e) => onPhoto(e.target.files?.[0])}
+                  className="sr-only"
+                />
+              </label>
+            ))}
+          </div>
           {photo && (
             <>
               <textarea

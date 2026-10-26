@@ -27,6 +27,7 @@ export default async function EditActivityPage({ params }: PageProps<"/log/activ
           steps: activity.steps ?? undefined,
           distanceKm: activity.distanceM !== null ? activity.distanceM / 1000 : undefined,
           activeMinutes: activity.activeMinutes ?? undefined,
+          totalKcal: activity.totalKcal ?? undefined,
         }}
       />
     </div>

@@ -511,6 +511,8 @@ export const activityDaily = sqliteTable(
     distanceM: real("distance_m"),
     activeMinutes: integer("active_minutes"),
     activeKcal: real("active_kcal"),
+    /** 手錶 / App 顯示的全日消耗熱量（含基礎代謝） */
+    totalKcal: real("total_kcal"),
     source: text("source", { enum: OBSERVATION_SOURCES }).notNull(),
     updatedAt: updatedAt(),
   },

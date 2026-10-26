@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
+import { getEnv } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { toLocalDate } from "@/lib/time";
 import { saveActivity } from "../lifestyle-actions";
@@ -12,7 +13,11 @@ export default async function ActivityPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="記錄步數 / 活動量" />
-      <ActivityForm action={saveActivity.bind(null, null)} today={toLocalDate(new Date(), user.timezone)} />
+      <ActivityForm
+        action={saveActivity.bind(null, null)}
+        today={toLocalDate(new Date(), user.timezone)}
+        aiConfigured={Boolean((await getEnv()).OPENROUTER_API_KEY)}
+      />
     </div>
   );
 }

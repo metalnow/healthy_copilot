@@ -147,6 +147,7 @@ export async function saveActivity(
   const steps = optionalInRange(formData, "steps", 0, 150000, "請輸入 0–150000 步", errors);
   const distanceKm = optionalInRange(formData, "distanceKm", 0, 300, "請輸入 0–300 公里", errors, false);
   const activeMinutes = optionalInRange(formData, "activeMinutes", 0, 1440, "請輸入 0–1440 分鐘", errors);
+  const totalKcal = optionalInRange(formData, "totalKcal", 0, 10000, "請輸入 0–10000 kcal", errors);
   if (steps === undefined && distanceKm === undefined && activeMinutes === undefined && !errors.steps) {
     errors.steps = "請至少輸入步數、距離或活動時間";
   }
@@ -155,10 +156,19 @@ export async function saveActivity(
   const db = await getDb();
   const distanceM = distanceKm !== undefined ? Math.round(distanceKm * 1000) : undefined;
   if (activityId) {
-    const ok = await updateActivity(db, user.id, activityId, { steps, distanceM, activeMinutes });
+    const ok = await updateActivity(db, user.id, activityId, { steps, distanceM, activeMinutes, totalKcal });
     return finishUpdate(db, user.id, "activity.update", activityId, ok);
   }
-  const id = await upsertActivity(db, user.id, { localDate, steps, distanceM, activeMinutes, source: "manual" });
+  // 從截圖匯入：確認擷取結果，來源記為截圖（同一天再匯入會覆蓋，當天稍早的截圖不會留下較小的數字）
+  const extractionId = formString(formData, "extractionId");
+  let source: "manual" | "screenshot" = "manual";
+  if (extractionId) {
+    const extraction = await getExtraction(db, user.id, extractionId);
+    if (extraction?.task === "activity_screenshot" && (await settleExtraction(db, user.id, extractionId, "confirmed"))) {
+      source = "screenshot";
+    }
+  }
+  const id = await upsertActivity(db, user.id, { localDate, steps, distanceM, activeMinutes, totalKcal, source });
   await recordAudit(db, { userId: user.id, action: "activity.upsert", entityId: id });
   redirect("/");
 }

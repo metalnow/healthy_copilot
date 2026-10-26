@@ -202,6 +202,18 @@ export const SleepScreenshotSchema = z.strictObject({
 });
 export type SleepScreenshot = z.infer<typeof SleepScreenshotSchema>;
 
+export const ActivityScreenshotSchema = z.strictObject({
+  isActivityData: z.boolean().describe("截圖是否為步數 / 活動量紀錄"),
+  date: text().describe("截圖上的日期 YYYY-MM-DD；沒有日期填空字串"),
+  steps: positive().describe("當天總步數；沒有填 0"),
+  distanceKm: positive().describe("距離（公里）；沒有填 0"),
+  activeMinutes: positive().describe("活動時間（分鐘）；沒有填 0"),
+  totalKcal: positive().describe("全日消耗熱量 kcal（含基礎代謝，例如「能量」「總消耗」）；沒有填 0"),
+  confidence: z.number().describe("整體信心 0–1"),
+  notes: text().describe("給使用者的補充；沒有填空字串"),
+});
+export type ActivityScreenshot = z.output<typeof ActivityScreenshotSchema>;
+
 export const MedicationLabelSchema = z.strictObject({
   isMedication: z.boolean().describe("照片是否為藥品、保健品的包裝、標籤或藥袋"),
   name: z.string().nullable().describe("品名（含規格，例如 Vitamin D3 1000 IU）"),

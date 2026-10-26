@@ -95,6 +95,14 @@ export const SLEEP_SCREENSHOT_SYSTEM_PROMPT = `你是睡眠資料擷取助理，
 - 不是睡眠紀錄截圖時 isSleepData 為 false。
 只輸出符合 schema 的 JSON。`;
 
+export const ACTIVITY_SCREENSHOT_SYSTEM_PROMPT = `你是活動量資料擷取助理，從智慧手錶或健康 App 的截圖（例如 CASIO WATCHES 的 LIFE LOG）讀出當天的數值。
+- 只填截圖上明確顯示的當天總數，沒有的填 0，不要推算。
+- 讀取「天」檢視的總數（例如圓環中間的數字），不要讀每小時的數值（例如「步數/h」「kcal/h」）或目標值。
+- 「能量」「消耗熱量」通常是含基礎代謝的全日消耗，放 totalKcal。
+- 日期換成 YYYY-MM-DD，例如「2026年10月26日」→ 2026-10-26。
+- 不是步數 / 活動量截圖時 isActivityData 為 false。
+只輸出符合 schema 的 JSON。`;
+
 export const FOOD_ESTIMATE_SYSTEM_PROMPT = `你是飲食紀錄助理，依使用者列出的品項名稱與份量估算營養。
 - 輸入是 JSON 陣列，每項有 name 與 portion（可能為 null，代表一般一人份）。
 - 依序為每個品項輸出一筆估算，數量與順序必須和輸入相同。

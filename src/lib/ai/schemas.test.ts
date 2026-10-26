@@ -7,6 +7,7 @@ import {
   MedicationLabelSchema,
   ReviewOutputSchema,
   SleepScreenshotSchema,
+  ActivityScreenshotSchema,
   TextParseResultSchema,
   toResponseSchema,
 } from "./schemas";
@@ -42,6 +43,7 @@ const AI_SCHEMAS = {
   FoodEstimateSchema,
   MedicationLabelSchema,
   SleepScreenshotSchema,
+  ActivityScreenshotSchema,
   ReviewOutputSchema,
   LabExtractionSchema,
   StoredLabExtractionSchema,

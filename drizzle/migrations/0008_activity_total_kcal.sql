@@ -1,0 +1,1 @@
+ALTER TABLE `activity_daily` ADD `total_kcal` real;

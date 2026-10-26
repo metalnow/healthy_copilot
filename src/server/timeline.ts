@@ -219,8 +219,9 @@ export async function getTimeline(
         a.steps != null && `${a.steps.toLocaleString("zh-TW")} 步`,
         a.distanceM != null && `${Math.round(a.distanceM / 100) / 10} 公里`,
         a.activeMinutes != null && `活動 ${a.activeMinutes} 分`,
+        a.totalKcal != null && `消耗 ${a.totalKcal.toLocaleString("zh-TW")} kcal`,
       ),
-      ai: false,
+      ai: a.source === "screenshot",
     })),
     ...lifestyle.exercise.map((e) => ({
       key: `exercise:${e.id}`,

@@ -91,12 +91,20 @@ export async function updateSleep(db: Db, user: SessionUser, id: string, input: 
 export async function upsertActivity(
   db: Db,
   userId: string,
-  input: { localDate: string; steps?: number; distanceM?: number; activeMinutes?: number; source: ObservationSource },
+  input: {
+    localDate: string;
+    steps?: number;
+    distanceM?: number;
+    activeMinutes?: number;
+    totalKcal?: number;
+    source: ObservationSource;
+  },
 ) {
   const values = {
     steps: input.steps ?? null,
     distanceM: input.distanceM ?? null,
     activeMinutes: input.activeMinutes ?? null,
+    totalKcal: input.totalKcal ?? null,
   };
   const [row] = await db
     .insert(activityDaily)
@@ -109,16 +117,31 @@ export async function upsertActivity(
   return row.id;
 }
 
+/** 某天手錶 / App 記錄的全日消耗熱量（多個來源取最大值） */
+export async function totalKcalForDate(db: Db, userId: string, localDate: string) {
+  const rows = await db
+    .select({ totalKcal: activityDaily.totalKcal })
+    .from(activityDaily)
+    .where(and(eq(activityDaily.userId, userId), eq(activityDaily.localDate, localDate)));
+  const values = rows.map((r) => r.totalKcal).filter((v): v is number => v !== null);
+  return values.length ? Math.max(...values) : null;
+}
+
 /** 修改某天的活動量（日期不變，避免與當天其他紀錄衝突） */
 export async function updateActivity(
   db: Db,
   userId: string,
   id: string,
-  input: { steps?: number; distanceM?: number; activeMinutes?: number },
+  input: { steps?: number; distanceM?: number; activeMinutes?: number; totalKcal?: number },
 ) {
   const updated = await db
     .update(activityDaily)
-    .set({ steps: input.steps ?? null, distanceM: input.distanceM ?? null, activeMinutes: input.activeMinutes ?? null })
+    .set({
+      steps: input.steps ?? null,
+      distanceM: input.distanceM ?? null,
+      activeMinutes: input.activeMinutes ?? null,
+      totalKcal: input.totalKcal ?? null,
+    })
     .where(and(eq(activityDaily.id, id), eq(activityDaily.userId, userId)))
     .returning({ id: activityDaily.id });
   return updated.length > 0;

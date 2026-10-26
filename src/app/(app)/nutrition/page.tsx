@@ -19,6 +19,7 @@ import {
 import { toLocalDate, toLocalTime } from "@/lib/time";
 import { listDrinksForDate, listFoodForDate } from "@/server/food";
 import { addDays } from "@/server/insights";
+import { totalKcalForDate } from "@/server/lifestyle";
 
 export const metadata: Metadata = { title: "營養攝取" };
 
@@ -35,7 +36,11 @@ export default async function NutritionPage({ searchParams }: PageProps<"/nutrit
   const day = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today ? date : today;
 
   const db = await getDb();
-  const [food, drinks] = await Promise.all([listFoodForDate(db, user.id, day), listDrinksForDate(db, user.id, day)]);
+  const [food, drinks, burned] = await Promise.all([
+    listFoodForDate(db, user.id, day),
+    listDrinksForDate(db, user.id, day),
+    totalKcalForDate(db, user.id, day),
+  ]);
   const entries: Entry[] = [
     ...food.map((f) => ({
       row: foodIntake(f),
@@ -88,6 +93,14 @@ export default async function NutritionPage({ searchParams }: PageProps<"/nutrit
                 {formatNutrient("kcal", totals.kcal ?? 0)}
                 <span className="ml-1 text-base font-normal text-muted">kcal</span>
               </p>
+              {burned !== null && (
+                <p className="mt-1 text-sm text-muted">
+                  手錶記錄消耗 {formatNutrient("kcal", burned)} kcal
+                  {totals.kcal !== undefined &&
+                    `・攝取${totals.kcal >= burned ? "多" : "少"} ${formatNutrient("kcal", Math.abs(totals.kcal - burned))} kcal`}
+                  {day === today && "（今天還沒結束，消耗會再增加）"}
+                </p>
+              )}
             </div>
             <dl className="grid grid-cols-3 gap-2">
               {(

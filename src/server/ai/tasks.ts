@@ -14,6 +14,7 @@ import {
   FOOD_ESTIMATE_SYSTEM_PROMPT,
   FOOD_PHOTO_SYSTEM_PROMPT,
   MEDICATION_LABEL_SYSTEM_PROMPT,
+  ACTIVITY_SCREENSHOT_SYSTEM_PROMPT,
   SLEEP_SCREENSHOT_SYSTEM_PROMPT,
   textParseSystemPrompt,
 } from "@/lib/ai/prompts";
@@ -21,6 +22,7 @@ import {
   FoodEstimateSchema,
   FoodPhotoResultSchema,
   MedicationLabelSchema,
+  ActivityScreenshotSchema,
   SleepScreenshotSchema,
   TextParseResultSchema,
 } from "@/lib/ai/schemas";
@@ -53,6 +55,14 @@ export type SleepDraft = {
   hrvMs?: number;
 };
 
+export type ActivityDraft = {
+  localDate?: string;
+  steps?: number;
+  distanceKm?: number;
+  activeMinutes?: number;
+  totalKcal?: number;
+};
+
 export type AiTaskResult = {
   extractionId: string;
   task: (typeof AI_TASKS)[number];
@@ -62,6 +72,8 @@ export type AiTaskResult = {
   unparsed?: string;
   /** 睡眠截圖的擷取結果（task = sleep_screenshot） */
   sleep?: SleepDraft;
+  /** 步數 / 活動量截圖的擷取結果（task = activity_screenshot） */
+  activity?: ActivityDraft;
   /** 藥品 / 保健品照片的擷取結果（task = medication_label） */
   medication?: MedicationDraft;
   /** 手動輸入品項的營養估算，順序與送出的品項相同（task = food_estimate） */
@@ -285,6 +297,57 @@ export async function transcribeAndParse(
 }
 
 const positive = (n: number | null) => (n !== null && n >= 0 ? Math.round(n) : undefined);
+
+export async function analyzeActivityScreenshot(
+  db: Db,
+  env: Env,
+  user: SessionUser,
+  image: { bytes: Uint8Array<ArrayBuffer>; mimeType: string; filename?: string },
+): Promise<AiTaskResult> {
+  const mediaId = await putMedia(db, env.MEDIA, user.id, { kind: "activity_screenshot", ...image });
+
+  return runTask(db, env, user, { task: "activity_screenshot", primaryProfile: "vision", mediaIds: [mediaId] }, async ({ config, steps }) => {
+    const profile = await getModelProfile(db, "vision");
+    const response = await generateStructured(config, {
+      model: profile.modelId,
+      maxTokens: profile.maxTokens,
+      system: ACTIVITY_SCREENSHOT_SYSTEM_PROMPT,
+      user: [
+        { type: "text", text: "請讀出這張截圖中當天的步數與活動量。" },
+        { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${toBase64(image.bytes)}` } },
+      ],
+      schema: ActivityScreenshotSchema,
+      schemaName: "activity_screenshot",
+    });
+    steps.push({ profile: "vision", modelId: response.model, ...response.usage });
+
+    const data = response.data;
+    const today = toLocalDate(new Date(), user.timezone);
+    // 截圖日期不能是未來；讀不到日期時用今天
+    const localDate = data.date && /^\d{4}-\d{2}-\d{2}$/.test(data.date) && data.date <= today ? data.date : today;
+    const round = (n: number | null, digits = 0) => (n === null ? undefined : Math.round(n * 10 ** digits) / 10 ** digits);
+    return {
+      result: {
+        drafts: [],
+        mediaId,
+        confidence: Math.min(1, Math.max(0, data.confidence)),
+        notes: data.isActivityData ? (data.notes ?? undefined) : "截圖看起來不是步數 / 活動量紀錄。",
+        activity: data.isActivityData
+          ? {
+              localDate,
+              steps: round(data.steps),
+              distanceKm: round(data.distanceKm, 2),
+              activeMinutes: round(data.activeMinutes),
+              totalKcal: round(data.totalKcal),
+            }
+          : undefined,
+      },
+      parsedOutput: { ...data, mediaId },
+      rawOutput: response.raw,
+      confidence: data.confidence,
+    };
+  });
+}
 
 export async function analyzeSleepScreenshot(
   db: Db,
