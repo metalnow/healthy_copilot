@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Assistant } from "@/components/assistant/assistant";
 import { BottomTabBar, TopNav } from "@/components/nav";
 import { requireUser } from "@/lib/auth/dal";
 
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </header>
       <main className="mx-auto max-w-3xl px-4 pt-4 pb-6">{children}</main>
       <BottomTabBar />
+      <Assistant />
     </div>
   );
 }

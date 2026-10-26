@@ -47,9 +47,13 @@ export function TopNav() {
 }
 
 /** 手機：固定在底部的分頁列（含安全區域與等高的佔位） */
+export function hasTabBar(pathname: string) {
+  return TAB_ROOTS.has(pathname);
+}
+
 export function BottomTabBar() {
   const pathname = usePathname();
-  if (!TAB_ROOTS.has(pathname)) return null;
+  if (!hasTabBar(pathname)) return null;
 
   return (
     <>
