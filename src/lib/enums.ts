@@ -48,6 +48,10 @@ export const INTENSITIES = ["low", "moderate", "high"] as const;
 export const GOAL_DIRECTIONS = ["increase", "decrease", "maintain"] as const;
 
 export const GOAL_STATUSES = ["active", "achieved", "paused"] as const;
+/** 追蹤事項：待安排、已預約、已完成、不追蹤 */
+export const FOLLOW_UP_STATUSES = ["open", "scheduled", "done", "dismissed"] as const;
+/** 追蹤事項來源：報告建議（AI 擷取）、檢驗異常、手動 */
+export const FOLLOW_UP_SOURCES = ["report", "finding", "manual"] as const;
 
 export const MEDIA_KINDS = ["health_report", "food_photo", "sleep_screenshot", "medication_photo", "audio"] as const;
 

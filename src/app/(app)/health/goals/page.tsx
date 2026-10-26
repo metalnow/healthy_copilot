@@ -1,13 +1,15 @@
 import { Lightbulb } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdviceList } from "@/components/advice-list";
 import { ConfirmButton } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { getGoalMetric, goalProgress, isGoalReached } from "@/lib/goals";
+import { adviceForMetric } from "@/lib/health-advice";
 import { toLocalDate } from "@/lib/time";
-import { currentMetricValue, goalSuggestions, listGoals } from "@/server/health";
+import { currentMetricValue, goalSuggestions, listGoals, recentIntake } from "@/server/health";
 import { adoptGoal, saveGoal, updateGoal } from "../actions";
 import { GoalForm } from "./goal-form";
 
@@ -33,7 +35,11 @@ const param = (v: string | string[] | undefined) => (typeof v === "string" ? v :
 export default async function GoalsPage({ searchParams }: PageProps<"/health/goals">) {
   const user = await requireUser();
   const db = await getDb();
-  const [goals, suggestions] = await Promise.all([listGoals(db, user.id), goalSuggestions(db, user)]);
+  const [goals, suggestions, intake] = await Promise.all([
+    listGoals(db, user.id),
+    goalSuggestions(db, user),
+    recentIntake(db, user),
+  ]);
   const currents = await Promise.all(goals.map((g) => currentMetricValue(db, user, g.metric)));
   const query = await searchParams;
 
@@ -65,6 +71,7 @@ export default async function GoalsPage({ searchParams }: PageProps<"/health/goa
                 <p className="text-xs text-muted">
                   基準 {s.baseline} {s.unit ?? ""}・建議在 {s.targetDate} 前
                 </p>
+                {adviceForMetric(s.metric) && <AdviceList advice={adviceForMetric(s.metric)!} intake={intake} />}
                 <div className="flex items-center gap-4 pt-1">
                   <form action={adoptGoal}>
                     <input type="hidden" name="metric" value={s.metric} />
@@ -112,6 +119,9 @@ export default async function GoalsPage({ searchParams }: PageProps<"/health/goa
                   目前：{current ? `${current.value} ${goal.unit ?? ""}（${current.date}）` : "尚無資料"}
                   {reached && <span className="ml-2 text-accent">已達標 🎉</span>}
                 </p>
+                {goal.status === "active" && adviceForMetric(goal.metric) && (
+                  <AdviceList advice={adviceForMetric(goal.metric)!} intake={intake} />
+                )}
                 {progress !== null && (
                   <div
                     className="h-2 overflow-hidden rounded-full bg-border"

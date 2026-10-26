@@ -1,14 +1,16 @@
 import { and, asc, eq } from "drizzle-orm";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConfirmButton } from "@/components/form";
 import { PageHeader } from "@/components/page-header";
 import { getDb } from "@/db";
-import { labObservations } from "@/db/schema";
-import { LabExtractionSchema } from "@/lib/ai/schemas";
+import { healthFollowUps, labObservations } from "@/db/schema";
+import { StoredLabExtractionSchema } from "@/lib/ai/schemas";
 import { requireUser } from "@/lib/auth/dal";
 import { labDisplayName } from "@/lib/labs/catalog";
-import { FLAG_CLASSES, FLAG_LABELS, formatLabValue, formatReference } from "@/lib/labs/format";
+import { followUpDraftsFromExtraction, FOLLOW_UP_STATUS_LABELS } from "@/lib/follow-ups";
+import { formatLabValue, formatReference, isLongLabText, labFlag } from "@/lib/labs/format";
 import { labDraftFromExtraction } from "@/lib/labs/review";
 import { getExtraction } from "@/server/ai/extractions";
 import { documentMedia, getHealthDocument } from "@/server/health";
@@ -29,7 +31,7 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
   const media = await documentMedia(db, user.id, doc);
   const extraction =
     doc.status === "review" && doc.extractionId ? await getExtraction(db, user.id, doc.extractionId) : null;
-  const parsed = extraction ? LabExtractionSchema.safeParse(extraction.parsedOutput) : null;
+  const parsed = extraction ? StoredLabExtractionSchema.safeParse(extraction.parsedOutput) : null;
   const saved =
     doc.status === "confirmed"
       ? await db
@@ -37,6 +39,14 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
           .from(labObservations)
           .where(and(eq(labObservations.sourceDocumentId, doc.id), eq(labObservations.userId, user.id)))
           .orderBy(asc(labObservations.createdAt))
+      : [];
+  const followUps =
+    doc.status === "confirmed"
+      ? await db
+          .select()
+          .from(healthFollowUps)
+          .where(and(eq(healthFollowUps.sourceDocumentId, doc.id), eq(healthFollowUps.userId, user.id)))
+          .orderBy(asc(healthFollowUps.createdAt))
       : [];
 
   return (
@@ -90,6 +100,7 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
               initial={{
                 ...labDraftFromExtraction(parsed.data),
                 reportDate: doc.reportDate ?? labDraftFromExtraction(parsed.data).reportDate,
+                followUps: followUpDraftsFromExtraction(parsed.data),
               }}
               notes={parsed.data.notes ?? undefined}
             />
@@ -102,26 +113,54 @@ export default async function ReportPage({ params }: PageProps<"/health/reports/
           <p className="text-sm text-warning">找不到擷取結果，請刪除後重新上傳。</p>
         ))}
 
+      {doc.status === "confirmed" && followUps.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-semibold">追蹤建議 {followUps.length} 項</h2>
+            <Link href="/health/follow-ups" className="text-sm text-accent">
+              追蹤事項 ›
+            </Link>
+          </div>
+          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            {followUps.map((f) => (
+              <li key={f.id} className="space-y-0.5 px-4 py-2.5 text-sm">
+                <p className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 font-medium break-words">{f.finding}</span>
+                  <span className="shrink-0 text-xs text-muted">{FOLLOW_UP_STATUS_LABELS[f.status]}</span>
+                </p>
+                <p className="text-muted">
+                  {f.action}
+                  {f.department && `（${f.department}）`}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {doc.status === "confirmed" && (
         <section className="space-y-2">
           <h2 className="font-semibold">已儲存 {saved.length} 項</h2>
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-            {saved.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="min-w-0">
-                  <span className="block">
-                    {labDisplayName(row)}
+            {saved.map((row) => {
+              const flag = labFlag(row);
+              const long = isLongLabText(row);
+              return (
+                <li key={row.id} className="px-4 py-2.5 text-sm">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block break-words">{labDisplayName(row)}</span>
+                      <span className="text-xs text-muted">{formatReference(row) && `參考 ${formatReference(row)}`}</span>
+                    </span>
+                    <span className="max-w-[55%] shrink-0 text-right">
+                      {!long && <span className="block font-medium break-words">{formatLabValue(row)}</span>}
+                      <span className={`text-xs ${flag.className}`}>{flag.label}</span>
+                    </span>
                   </span>
-                  <span className="text-xs text-muted">{formatReference(row) && `參考 ${formatReference(row)}`}</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-medium">{formatLabValue(row)}</span>
-                  <span className={`text-xs ${FLAG_CLASSES[row.abnormalFlag ?? "unknown"]}`}>
-                    {FLAG_LABELS[row.abnormalFlag ?? "unknown"]}
-                  </span>
-                </span>
-              </li>
-            ))}
+                  {long && <span className="mt-1 block text-muted">{row.textValue}</span>}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

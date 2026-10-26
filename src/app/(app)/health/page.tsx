@@ -3,7 +3,9 @@ import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/dal";
 import { getLabDefinition, LAB_CATEGORIES, labDisplayName, type LabCategory } from "@/lib/labs/catalog";
-import { FLAG_CLASSES, FLAG_LABELS, formatLabValue } from "@/lib/labs/format";
+import { formatLabValue, isLongLabText, labFlag } from "@/lib/labs/format";
+import { toLocalDate } from "@/lib/time";
+import { findingSuggestions, listFollowUps } from "@/server/follow-ups";
 import { getHealthProfile, goalSuggestions, listGoals, listHealthDocuments, listLabs, summarizeLabs } from "@/server/health";
 
 export const metadata: Metadata = { title: "健康" };
@@ -35,14 +37,19 @@ function Trend({ latest, previous }: { latest: number | null; previous: number |
 export default async function HealthPage() {
   const user = await requireUser();
   const db = await getDb();
-  const [profile, labs, documents, goals, suggestions] = await Promise.all([
+  const [profile, labs, documents, goals, suggestions, followUps] = await Promise.all([
     getHealthProfile(db, user.id),
     listLabs(db, user.id),
     listHealthDocuments(db, user.id),
     listGoals(db, user.id),
     goalSuggestions(db, user),
+    listFollowUps(db, user.id),
   ]);
   const suggestionCount = suggestions.length;
+  const findings = await findingSuggestions(db, user.id, followUps);
+  const today = toLocalDate(new Date(), user.timezone);
+  const activeFollowUps = followUps.filter((f) => f.status === "open" || f.status === "scheduled");
+  const nextDue = activeFollowUps.find((f) => f.dueDate !== null);
 
   const summaries = summarizeLabs(labs);
   const byCategory = new Map<LabCategory, typeof summaries>();
@@ -110,6 +117,37 @@ export default async function HealthPage() {
         )}
       </Card>
 
+      <Card
+        title="追蹤事項"
+        action={
+          <Link href="/health/follow-ups" className="text-sm text-accent">
+            {followUps.length ? "查看" : "新增"}
+          </Link>
+        }
+      >
+        {activeFollowUps.length > 0 ? (
+          <ul className="space-y-1.5 text-sm">
+            {activeFollowUps.slice(0, 3).map((f) => (
+              <li key={f.id} className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 truncate">{f.finding}</span>
+                <span className={`shrink-0 text-xs ${f.dueDate && f.dueDate < today ? "text-warning" : "text-muted"}`}>
+                  {f.dueDate ?? "未安排"}
+                </span>
+              </li>
+            ))}
+            {activeFollowUps.length > 3 && <li className="text-xs text-muted">還有 {activeFollowUps.length - 3} 項</li>}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">沒有待追蹤的事項。</p>
+        )}
+        {nextDue?.dueDate && nextDue.dueDate < today && <p className="text-xs text-warning">有追蹤事項已過建議日期。</p>}
+        {findings.length > 0 && (
+          <Link href="/health/follow-ups" className="block text-sm text-accent">
+            檢查結果有 {findings.length} 項可能需要追蹤 ›
+          </Link>
+        )}
+      </Card>
+
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="font-semibold">檢驗結果（Baseline）</h2>
@@ -128,33 +166,34 @@ export default async function HealthPage() {
               <div key={category} className="rounded-xl border border-border bg-surface">
                 <h3 className="border-b border-border px-4 py-2 text-sm text-muted">{LAB_CATEGORIES[category]}</h3>
                 <ul className="divide-y divide-border">
-                  {byCategory.get(category)!.map(({ key, latest, previous, count }) => (
-                    <li key={key}>
-                      <Link
-                        href={`/health/labs/${encodeURIComponent(key)}`}
-                        className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-background"
-                      >
-                        <span className="min-w-0">
-                          <span className="block text-sm">
-                            {labDisplayName(latest)}
-                          </span>
-                          <span className="text-xs text-muted">
-                            {latest.measuredAt}
-                            {count > 1 && `・共 ${count} 筆`}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-right">
-                          <span className="block text-sm font-medium">{formatLabValue(latest)}</span>
-                          <span className="flex items-center justify-end gap-2">
-                            <Trend latest={latest.value} previous={previous?.value} />
-                            <span className={`text-xs ${FLAG_CLASSES[latest.abnormalFlag ?? "unknown"]}`}>
-                              {FLAG_LABELS[latest.abnormalFlag ?? "unknown"]}
+                  {byCategory.get(category)!.map(({ key, latest, previous, count }) => {
+                    const flag = labFlag(latest);
+                    const long = isLongLabText(latest);
+                    return (
+                      <li key={key}>
+                        <Link href={`/health/labs/${encodeURIComponent(key)}`} className="block px-4 py-2.5 hover:bg-background">
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="min-w-0">
+                              <span className="block text-sm break-words">{labDisplayName(latest)}</span>
+                              <span className="text-xs text-muted">
+                                {latest.measuredAt}
+                                {count > 1 && `・共 ${count} 筆`}
+                              </span>
+                            </span>
+                            <span className="max-w-[55%] shrink-0 text-right">
+                              {!long && <span className="block text-sm font-medium break-words">{formatLabValue(latest)}</span>}
+                              <span className="flex items-center justify-end gap-2">
+                                <Trend latest={latest.value} previous={previous?.value} />
+                                <span className={`text-xs ${flag.className}`}>{flag.label}</span>
+                              </span>
                             </span>
                           </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
+                          {/* 超音波等描述性結果放在名稱下方，避免擠壓名稱 */}
+                          {long && <span className="mt-1 line-clamp-3 block text-sm text-muted">{latest.textValue}</span>}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ))

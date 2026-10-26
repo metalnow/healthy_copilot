@@ -144,9 +144,36 @@ export function isGroupedByName(code: string) {
   return BY_CODE.get(code)?.byName ?? false;
 }
 
+/** 超音波部位：各院所寫法不同（「腹部超音波(ABD Ultrasound)」「腹部超音波檢查」），統一成部位名稱才能跨年度比較 */
+const ULTRASOUND_SITES: [RegExp, string][] = [
+  [/腹部|abd|abdom/i, "腹部超音波"],
+  [/攝護腺|前列腺|prostat/i, "攝護腺超音波"],
+  [/甲狀腺|thyroid/i, "甲狀腺超音波"],
+  [/乳房|breast/i, "乳房超音波"],
+  [/頸動脈|carotid/i, "頸動脈超音波"],
+  [/心臟|cardiac|echocardio/i, "心臟超音波"],
+  [/骨盆|子宮|卵巢|婦科|pelvi|uter|ovar/i, "骨盆腔超音波"],
+  [/腎|膀胱|泌尿|renal|kidney|bladder/i, "腎臟 / 泌尿道超音波"],
+  [/肝|膽|胰|脾|liver|gallbladder/i, "腹部超音波"],
+];
+
+/** 依名稱分組項目的統一名稱：超音波依部位；其他只整理空白 */
+export function canonicalLabName(code: string, displayName: string): string {
+  const name = displayName.replace(/\s+/g, " ").trim();
+  if (code !== "ULTRASOUND") return name;
+  return ULTRASOUND_SITES.find(([pattern]) => pattern.test(name))?.[1] ?? "超音波";
+}
+
+/** 名稱是超音波、但 AI 對到 OTHER 的項目 */
+export function inferLabCode(code: string, displayName: string): string {
+  return code === "OTHER" && /超音波|ultrasound|sonograph/i.test(displayName) ? "ULTRASOUND" : code;
+}
+
 /** 畫面上的項目名稱：依名稱分組的項目用報告原文，其他用代碼表名稱 */
 export function labDisplayName(row: { code: string; displayName: string }) {
-  return isGroupedByName(row.code) ? row.displayName : (BY_CODE.get(row.code)?.name ?? row.displayName);
+  return isGroupedByName(row.code)
+    ? canonicalLabName(row.code, row.displayName)
+    : (BY_CODE.get(row.code)?.name ?? row.displayName);
 }
 
 // ─── 過敏原特異性 IgE（RAST / ImmunoCAP 分級） ───────────────

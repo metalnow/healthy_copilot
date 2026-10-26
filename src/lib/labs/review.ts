@@ -1,7 +1,16 @@
 import { z } from "zod";
 import { ABNORMAL_FLAGS } from "@/lib/enums";
 import type { LabExtraction } from "@/lib/ai/schemas";
-import { defaultFlag, flagFromReference, getLabDefinition, LAB_CODES, toCanonicalUnit } from "./catalog";
+import { FollowUpDraftSchema } from "@/lib/follow-ups";
+import {
+  canonicalLabName,
+  defaultFlag,
+  flagFromReference,
+  getLabDefinition,
+  inferLabCode,
+  LAB_CODES,
+  toCanonicalUnit,
+} from "./catalog";
 
 const optionalNumber = z.number().finite().optional();
 
@@ -29,6 +38,7 @@ export const ConfirmLabsSchema = z.object({
   reportDate: z.iso.date("請輸入檢查日期"),
   institution: z.string().trim().max(100).optional(),
   items: z.array(LabDraftItemSchema).min(1, "沒有要儲存的項目").max(300),
+  followUps: z.array(FollowUpDraftSchema).max(50).default([]),
 });
 export type ConfirmLabs = z.infer<typeof ConfirmLabsSchema>;
 
@@ -43,7 +53,7 @@ export function labDraftFromExtraction(extraction: LabExtraction): {
   const items = extraction.items
     .filter((i) => i.displayName.trim() !== "" && (i.value !== null || (i.textValue ?? "").trim() !== ""))
     .map((i) => ({
-      code: (codes.has(i.code) ? i.code : "OTHER") as LabDraftItem["code"],
+      code: inferLabCode(codes.has(i.code) ? i.code : "OTHER", i.displayName) as LabDraftItem["code"],
       displayName: i.displayName.trim().slice(0, 100),
       value: opt(i.value),
       textValue: opt(i.textValue)?.trim().slice(0, 500) || undefined,
@@ -88,7 +98,7 @@ export function toLabObservationValues(item: LabDraftItem): LabObservationValues
 
   return {
     code: item.code,
-    displayName: item.displayName,
+    displayName: canonicalLabName(item.code, item.displayName),
     value,
     textValue: item.textValue ?? null,
     unit,

@@ -6,10 +6,12 @@ import { LOW_CONFIDENCE } from "@/lib/ai/draft";
 import { ABNORMAL_FLAGS } from "@/lib/enums";
 import { LAB_CATALOG, LAB_CATEGORIES, toCanonicalUnit } from "@/lib/labs/catalog";
 import { FLAG_LABELS } from "@/lib/labs/format";
+import type { FollowUpDraft } from "@/lib/follow-ups";
 import type { LabDraftItem } from "@/lib/labs/review";
 import { confirmLabs } from "../../actions";
 
 type Row = LabDraftItem & { key: number };
+type FollowUpRow = FollowUpDraft & { key: number };
 let nextKey = 1;
 
 const smallInput = `${inputClass} px-2 py-1.5 text-sm`;
@@ -47,14 +49,18 @@ export function LabReviewEditor({
   notes,
 }: {
   documentId: string;
-  initial: { reportDate?: string; institution?: string; items: LabDraftItem[] };
+  initial: { reportDate?: string; institution?: string; items: LabDraftItem[]; followUps: FollowUpDraft[] };
   notes?: string;
 }) {
   const [reportDate, setReportDate] = useState(initial.reportDate ?? "");
   const [institution, setInstitution] = useState(initial.institution ?? "");
   const [rows, setRows] = useState<Row[]>(() => initial.items.map((i) => ({ ...i, key: nextKey++ })));
+  const [followUps, setFollowUps] = useState<FollowUpRow[]>(() => initial.followUps.map((f) => ({ ...f, key: nextKey++ })));
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
+
+  const updateFollowUp = (key: number, patch: Partial<FollowUpDraft>) =>
+    setFollowUps((current) => current.map((f) => (f.key === key ? { ...f, ...patch } : f)));
 
   const update = (key: number, patch: Partial<LabDraftItem>) =>
     setRows((current) => current.map((r) => (r.key === key ? { ...r, ...patch, confidence: undefined } : r)));
@@ -72,6 +78,8 @@ export function LabReviewEditor({
         reportDate,
         institution: institution.trim() || undefined,
         items,
+        // 完全空白的追蹤列直接略過
+        followUps: followUps.filter((f) => f.finding.trim() || f.action.trim()).map((f) => ({ finding: f.finding, action: f.action, department: f.department, intervalMonths: f.intervalMonths })),
       });
       if (result?.error) setError(result.error);
     });
@@ -208,6 +216,79 @@ export function LabReviewEditor({
         ＋ 新增一項
       </button>
 
+      <section className="space-y-3 border-t border-border pt-4">
+        <h3 className="font-semibold">追蹤建議</h3>
+        <p className="text-sm text-muted">
+          {followUps.length > 0
+            ? "AI 從報告的健康建議、醫師評語整理出以下追蹤事項，確認後會加入「追蹤事項」。不需要的可以刪除。"
+            : "報告上沒有找到追蹤建議。需要時可以自己新增。"}
+        </p>
+        <ul className="space-y-3">
+          {followUps.map((f, index) => (
+            <li key={f.key} className="space-y-2 rounded-xl border border-border bg-surface p-3">
+              <div className="flex items-center justify-between text-xs text-muted">
+                <span>追蹤 {index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => setFollowUps((current) => current.filter((x) => x.key !== f.key))}
+                  aria-label={`刪除追蹤 ${index + 1}`}
+                  className="px-1"
+                >
+                  刪除
+                </button>
+              </div>
+              <input
+                value={f.finding}
+                onChange={(e) => updateFollowUp(f.key, { finding: e.target.value })}
+                placeholder="發現，例如 膽囊息肉 0.4 cm"
+                aria-label={`追蹤 ${index + 1} 發現`}
+                maxLength={200}
+                className={smallInput}
+              />
+              <input
+                value={f.action}
+                onChange={(e) => updateFollowUp(f.key, { action: e.target.value })}
+                placeholder="建議作法，例如 6 個月後複檢超音波"
+                aria-label={`追蹤 ${index + 1} 建議作法`}
+                maxLength={300}
+                className={smallInput}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={f.department ?? ""}
+                  onChange={(e) => updateFollowUp(f.key, { department: e.target.value || undefined })}
+                  placeholder="科別"
+                  aria-label={`追蹤 ${index + 1} 科別`}
+                  maxLength={50}
+                  className={smallInput}
+                />
+                <label className="flex items-center gap-1 text-sm">
+                  <input
+                    inputMode="numeric"
+                    value={f.intervalMonths ?? ""}
+                    onChange={(e) => {
+                      const n = Math.round(Number(e.target.value));
+                      updateFollowUp(f.key, { intervalMonths: e.target.value && n >= 1 && n <= 60 ? n : undefined });
+                    }}
+                    placeholder="—"
+                    aria-label={`追蹤 ${index + 1} 幾個月後`}
+                    className={`${smallInput} w-16`}
+                  />
+                  個月後
+                </label>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => setFollowUps((current) => [...current, { key: nextKey++, finding: "", action: "" }])}
+          className="text-sm text-accent"
+        >
+          ＋ 新增追蹤
+        </button>
+      </section>
+
       <FormError message={error} />
       <button
         type="button"
@@ -215,7 +296,7 @@ export function LabReviewEditor({
         disabled={pending || rows.length === 0 || !reportDate}
         className="w-full rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground disabled:opacity-60"
       >
-        {pending ? "儲存中…" : `確認儲存 ${rows.length} 項`}
+        {pending ? "儲存中…" : `確認儲存 ${rows.length} 項${followUps.length ? `與 ${followUps.length} 個追蹤` : ""}`}
       </button>
     </div>
   );

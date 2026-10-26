@@ -149,14 +149,41 @@ export const LabExtractionItemSchema = z.strictObject({
 });
 export type LabExtractionItem = z.infer<typeof LabExtractionItemSchema>;
 
+export const LabFollowUpSchema = z.strictObject({
+  finding: z.string().describe("需要追蹤的發現或異常，例如「脂肪肝（輕度）」「膽囊息肉 0.4 cm」「血脂偏高」"),
+  action: z.string().describe("報告建議的作法（精簡原文），例如「定期至肝膽腸胃科追蹤」「6 個月後複檢腹部超音波」"),
+  department: text().describe("建議就診的科別；沒寫填空字串"),
+  intervalMonths: positive().describe("建議幾個月後追蹤或複檢；沒寫填 0"),
+  page: positive().describe("所在頁碼（從 1 開始）；不確定填 0"),
+});
+export type LabFollowUp = z.output<typeof LabFollowUpSchema>;
+
 export const LabExtractionSchema = z.strictObject({
   isHealthReport: z.boolean().describe("是否為健檢或檢驗報告"),
   reportDate: z.string().nullable().describe("檢查日期 YYYY-MM-DD"),
   institution: z.string().nullable().describe("醫療院所名稱"),
   items: z.array(LabExtractionItemSchema),
+  followUps: z
+    .array(LabFollowUpSchema)
+    .describe("報告中醫師建議的追蹤、複檢、就診或生活調整（健康建議、醫師評語、綜合結論）；沒有填空陣列"),
   notes: z.string().nullable().describe("給使用者的補充，例如模糊無法辨識的頁面"),
 });
-export type LabExtraction = z.infer<typeof LabExtractionSchema>;
+export type LabExtraction = z.output<typeof LabExtractionSchema>;
+
+/** 存在 ai_extractions.parsed_output 的格式（transform 之後）；舊資料沒有 followUps */
+export const StoredLabExtractionSchema = LabExtractionSchema.extend({
+  followUps: z
+    .array(
+      z.object({
+        finding: z.string(),
+        action: z.string(),
+        department: z.string().nullable(),
+        intervalMonths: z.number().nullable(),
+        page: z.number().nullable(),
+      }),
+    )
+    .default([]),
+});
 
 export const SleepScreenshotSchema = z.strictObject({
   isSleepData: z.boolean().describe("截圖是否為睡眠紀錄"),

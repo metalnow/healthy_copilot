@@ -7,10 +7,13 @@ import { getDb, getEnv } from "@/db";
 import { recordAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/dal";
 import { formNumber, formString, type ActionState } from "@/lib/form";
+import { FollowUpDraftSchema } from "@/lib/follow-ups";
 import { getGoalMetric } from "@/lib/goals";
 import { getLabDefinition } from "@/lib/labs/catalog";
 import { ConfirmLabsSchema, LabDraftItemSchema } from "@/lib/labs/review";
+import { toLocalDate } from "@/lib/time";
 import { retryHealthReport } from "@/server/ai/reports";
+import { createFollowUp, deleteFollowUp, listFollowUps, updateFollowUp } from "@/server/follow-ups";
 import {
   addManualLab,
   confirmLabReport,
@@ -19,6 +22,7 @@ import {
   deleteGoal,
   deleteHealthDocument,
   deleteLab,
+  getHealthDocument,
   saveHealthProfile,
   setGoalStatus,
 } from "@/server/health";
@@ -28,7 +32,8 @@ export async function confirmLabs(input: unknown): Promise<{ error: string }> {
   const parsed = ConfirmLabsSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    const row = issue?.path[0] === "items" && typeof issue.path[1] === "number" ? `第 ${issue.path[1] + 1} 列：` : "";
+    const index = typeof issue?.path[1] === "number" ? issue.path[1] + 1 : null;
+    const row = index === null ? "" : issue?.path[0] === "items" ? `第 ${index} 列：` : issue?.path[0] === "followUps" ? `追蹤 ${index}：` : "";
     return { error: `${row}${issue?.message ?? "內容不正確"}` };
   }
   const db = await getDb();
@@ -38,7 +43,7 @@ export async function confirmLabs(input: unknown): Promise<{ error: string }> {
     userId: user.id,
     action: "health_document.confirm",
     entityId: parsed.data.documentId,
-    metadata: { items: parsed.data.items.length },
+    metadata: { items: parsed.data.items.length, followUps: parsed.data.followUps.length },
   });
   redirect(`/health/reports/${parsed.data.documentId}`);
 }
@@ -202,4 +207,77 @@ export async function updateGoal(formData: FormData) {
     }
   }
   revalidatePath("/health/goals");
+}
+
+// ─── 追蹤事項 ──────────────────────────────────────────────
+
+/** 新增追蹤事項：手動輸入，或採用檢驗異常的提示（source = finding） */
+export async function saveFollowUp(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = FollowUpDraftSchema.safeParse({
+    finding: formString(formData, "finding"),
+    action: formString(formData, "action") ?? "與醫師討論是否需要追蹤或進一步檢查",
+    department: formString(formData, "department"),
+    labKey: formString(formData, "labKey"),
+  });
+  const dueDate = formString(formData, "dueDate");
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] ??= issue.message;
+    return { fieldErrors };
+  }
+  if (dueDate && !z.iso.date().safeParse(dueDate).success) return { fieldErrors: { dueDate: "日期格式不正確" } };
+
+  const db = await getDb();
+  const fromFinding = formString(formData, "source") === "finding";
+  const foundAt = formString(formData, "foundAt");
+  // 同一次檢查的同一項目只建立一次（重複點擊時）
+  if (fromFinding && parsed.data.labKey) {
+    const existing = await listFollowUps(db, user.id);
+    if (existing.some((f) => f.labKey === parsed.data.labKey && f.foundAt === foundAt)) redirect("/health/follow-ups");
+  }
+  const sourceDocumentId = formString(formData, "sourceDocumentId");
+  const id = await createFollowUp(db, user.id, {
+    ...parsed.data,
+    source: fromFinding ? "finding" : "manual",
+    foundAt: foundAt && z.iso.date().safeParse(foundAt).success ? foundAt : null,
+    dueDate: dueDate ?? null,
+    // 只接受自己的報告
+    sourceDocumentId: sourceDocumentId && (await getHealthDocument(db, user.id, sourceDocumentId)) ? sourceDocumentId : null,
+  });
+  if (formString(formData, "dismiss") === "1") await updateFollowUp(db, user.id, id, { status: "dismissed" });
+  await recordAudit(db, { userId: user.id, action: "health_follow_up.create", entityId: id });
+  revalidatePath("/health", "layout");
+  redirect("/health/follow-ups");
+}
+
+/** 採用 / 略過檢驗異常的提示（表單直接送出，不需要回傳狀態） */
+export async function adoptFollowUp(formData: FormData) {
+  await saveFollowUp({}, formData);
+}
+
+export async function changeFollowUp(formData: FormData) {
+  const user = await requireUser();
+  const id = formString(formData, "id");
+  const action = formString(formData, "action");
+  if (!id) return;
+  const db = await getDb();
+  const today = toLocalDate(new Date(), user.timezone);
+  let changed = false;
+  if (action === "delete") {
+    changed = await deleteFollowUp(db, user.id, id);
+  } else if (action === "schedule") {
+    const date = z.iso.date().safeParse(formString(formData, "dueDate"));
+    if (date.success) changed = await updateFollowUp(db, user.id, id, { status: "scheduled", dueDate: date.data });
+  } else if (action === "done") {
+    changed = await updateFollowUp(db, user.id, id, { status: "done", completedAt: today });
+  } else if (action === "dismissed") {
+    changed = await updateFollowUp(db, user.id, id, { status: "dismissed" });
+  } else if (action === "open") {
+    changed = await updateFollowUp(db, user.id, id, { status: "open", completedAt: null });
+  } else if (action === "note") {
+    changed = await updateFollowUp(db, user.id, id, { note: formString(formData, "note")?.slice(0, 500) ?? null });
+  }
+  if (changed) await recordAudit(db, { userId: user.id, action: `health_follow_up.${action}`, entityId: id });
+  revalidatePath("/health", "layout");
 }

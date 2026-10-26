@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  canonicalLabName,
   defaultFlag,
   flagFromReference,
+  inferLabCode,
   isGroupedByName,
   LAB_CODES,
   labDisplayName,
@@ -76,5 +78,18 @@ describe("lab catalog", () => {
     expect(labDisplayName({ code: "IGE_SPECIFIC", displayName: "e1 貓皮毛" })).toBe("e1 貓皮毛");
     expect(labDisplayName({ code: "ULTRASOUND", displayName: "甲狀腺超音波" })).toBe("甲狀腺超音波");
     expect(labDisplayName({ code: "TG", displayName: "T-G三酸甘油脂" })).toBe("三酸甘油酯");
+  });
+});
+
+describe("canonicalLabName", () => {
+  it("超音波依部位統一名稱", () => {
+    expect(canonicalLabName("ULTRASOUND", "腹部超音波(ABD Ultrasound)")).toBe("腹部超音波");
+    expect(canonicalLabName("ULTRASOUND", "腹部超音波檢查")).toBe("腹部超音波");
+    expect(canonicalLabName("ULTRASOUND", "攝護腺超音波(Prostate Ultrasound)")).toBe("攝護腺超音波");
+    expect(canonicalLabName("ULTRASOUND", "Thyroid Echo")).toBe("甲狀腺超音波");
+    expect(canonicalLabName("ULTRASOUND", "超音波檢查")).toBe("超音波");
+    expect(canonicalLabName("IGE_SPECIFIC", "  d1   塵蟎 ")).toBe("d1 塵蟎");
+    expect(inferLabCode("OTHER", "腹部超音波")).toBe("ULTRASOUND");
+    expect(inferLabCode("OTHER", "鐵蛋白")).toBe("OTHER");
   });
 });

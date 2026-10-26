@@ -1,9 +1,10 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { chunkForInsert } from "@/db/batch";
 import type { Db } from "@/db/client";
 import { drinkEvents, foodEvents, foodItems } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
 import type { DrinkType, INPUT_TYPES, MealType } from "@/lib/enums";
+import { drinkIntake, foodIntake, sumIntake, type NutrientKey, type NutrientValues } from "@/lib/nutrition";
 import type { NutritionEstimate } from "@/lib/schemas/common";
 import { eventTimeFields } from "@/lib/time";
 
@@ -143,6 +144,30 @@ export async function listDrinksForDate(db: Db, userId: string, localDate: strin
     .from(drinkEvents)
     .where(and(eq(drinkEvents.userId, userId), eq(drinkEvents.localDate, localDate)))
     .orderBy(desc(drinkEvents.occurredAt));
+}
+
+/** 期間內有飲食紀錄的日子，每日平均攝取（估算）；沒有紀錄的日子不算進平均 */
+export async function intakeAverage(db: Db, userId: string, from: string, to: string) {
+  const [food, drinks] = await Promise.all([
+    db
+      .select()
+      .from(foodEvents)
+      .where(and(eq(foodEvents.userId, userId), gte(foodEvents.localDate, from), lte(foodEvents.localDate, to))),
+    db
+      .select()
+      .from(drinkEvents)
+      .where(and(eq(drinkEvents.userId, userId), gte(drinkEvents.localDate, from), lte(drinkEvents.localDate, to))),
+  ]);
+  const days = new Set(food.map((f) => f.localDate));
+  if (days.size === 0) return { days: 0, averages: {} as NutrientValues };
+  // 只有飲料紀錄的日子通常是漏記正餐，不算進平均
+  const rows = [...food.map(foodIntake), ...drinks.filter((d) => days.has(d.localDate)).map(drinkIntake)];
+  const { totals } = sumIntake(rows);
+  const averages: NutrientValues = {};
+  for (const [key, value] of Object.entries(totals) as [NutrientKey, number][]) {
+    averages[key] = Math.round((value / days.size) * 10) / 10;
+  }
+  return { days: days.size, averages };
 }
 
 /** 最近吃過的品項，供快速選取 */

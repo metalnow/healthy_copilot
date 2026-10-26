@@ -24,6 +24,7 @@ export const BACKUP_TABLES = [
   { file: "profile.json", table: "health_profiles", owner: "user_id" },
   { file: "settings.json", table: "user_settings", owner: "user_id" },
   { file: "goals.json", table: "health_goals", owner: "user_id" },
+  { file: "follow-ups.json", table: "health_follow_ups", owner: "user_id" },
   { file: "observations.json", table: "observations", owner: "user_id" },
   { file: "food-events.json", table: "food_events", owner: "user_id" },
   { file: "food-items.json", table: "food_items", parent: { table: "food_events", fk: "food_event_id" } },

@@ -20,6 +20,7 @@ describe("lab review", () => {
       reportDate: "2026-09-15",
       institution: "某某醫院",
       notes: null,
+      followUps: [],
       items: [
         { ...base, code: "TG", displayName: "三酸甘油酯", value: 2.18, unit: "mmol/L", referenceMax: 1.7 },
         { ...base, code: "FOO", displayName: "鐵蛋白", value: 120, unit: "ng/mL" },

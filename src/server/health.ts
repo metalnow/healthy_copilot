@@ -5,6 +5,7 @@ import {
   activityDaily,
   exerciseSessions,
   healthDocuments,
+  healthFollowUps,
   healthGoals,
   healthProfiles,
   labObservations,
@@ -13,13 +14,15 @@ import {
   sleepSessions,
 } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
+import { dueDateFor } from "@/lib/follow-ups";
 import { suggestGoals } from "@/lib/goal-suggestions";
 import { goalDirection } from "@/lib/goals";
-import { isGroupedByName } from "@/lib/labs/catalog";
+import { canonicalLabName, isGroupedByName } from "@/lib/labs/catalog";
 import { toLabObservationValues, type ConfirmLabs, type LabDraftItem } from "@/lib/labs/review";
 import { sleepDurationMin } from "@/lib/sleep";
 import { toLocalDate } from "@/lib/time";
 import { settleExtraction } from "@/server/ai/extractions";
+import { intakeAverage } from "@/server/food";
 
 export type LabRow = typeof labObservations.$inferSelect;
 export type HealthDocumentRow = typeof healthDocuments.$inferSelect;
@@ -76,10 +79,21 @@ export async function confirmLabReport(db: Db, user: SessionUser, input: Confirm
     extractionId: doc.extractionId,
     verifiedByUser: true,
   }));
-  await runBatch(
-    db,
-    chunkForInsert(labObservations, rows).map((chunk) => db.insert(labObservations).values(chunk)),
-  );
+  const followUps = input.followUps.map((f) => ({
+    userId: user.id,
+    finding: f.finding,
+    action: f.action,
+    department: f.department ?? null,
+    labKey: f.labKey ?? null,
+    sourceDocumentId: doc.id,
+    foundAt: input.reportDate,
+    dueDate: dueDateFor(input.reportDate, f.intervalMonths),
+    source: "report" as const,
+  }));
+  await runBatch(db, [
+    ...chunkForInsert(labObservations, rows).map((chunk) => db.insert(labObservations).values(chunk)),
+    ...chunkForInsert(healthFollowUps, followUps).map((chunk) => db.insert(healthFollowUps).values(chunk)),
+  ]);
   return null;
 }
 
@@ -98,6 +112,7 @@ export async function deleteHealthDocument(db: Db, bucket: R2Bucket, userId: str
   const media = [...pages, ...text];
   await db.batch([
     db.delete(labObservations).where(and(eq(labObservations.sourceDocumentId, id), eq(labObservations.userId, userId))),
+    db.delete(healthFollowUps).where(and(eq(healthFollowUps.sourceDocumentId, id), eq(healthFollowUps.userId, userId))),
     db.delete(healthDocuments).where(eq(healthDocuments.id, id)),
     db.delete(mediaObjects).where(
       inArray(
@@ -130,7 +145,7 @@ export async function deleteLab(db: Db, userId: string, id: string) {
 
 /** 檢驗項目的分組 key：OTHER、過敏原、超音波等依名稱區分 */
 export function labKey(row: Pick<LabRow, "code" | "displayName">) {
-  return isGroupedByName(row.code) ? `${row.code}:${row.displayName}` : row.code;
+  return isGroupedByName(row.code) ? `${row.code}:${canonicalLabName(row.code, row.displayName)}` : row.code;
 }
 
 export async function listLabs(db: Db, userId: string) {
@@ -157,19 +172,14 @@ export function summarizeLabs(rows: LabRow[]) {
 }
 
 export async function labHistory(db: Db, userId: string, key: string) {
-  const [code, ...rest] = key.split(":");
-  const name = rest.join(":");
-  return db
+  const [code] = key.split(":");
+  const rows = await db
     .select()
     .from(labObservations)
-    .where(
-      and(
-        eq(labObservations.userId, userId),
-        eq(labObservations.code, code),
-        ...(isGroupedByName(code) ? [eq(labObservations.displayName, name)] : []),
-      ),
-    )
+    .where(and(eq(labObservations.userId, userId), eq(labObservations.code, code)))
     .orderBy(asc(labObservations.measuredAt));
+  // 依名稱分組的項目：舊資料的名稱寫法可能不同，用統一名稱比對
+  return isGroupedByName(code) ? rows.filter((r) => labKey(r) === key) : rows;
 }
 
 // ─── 基本資料 ──────────────────────────────────────────────
@@ -311,4 +321,9 @@ export async function goalSuggestions(db: Db, user: Pick<SessionUser, "id" | "ti
     activeMetrics: new Set(goals.filter((g) => g.status === "active").map((g) => g.metric)),
     today: toLocalDate(new Date(), user.timezone),
   });
+}
+
+/** 近 7 天（含今天）有飲食紀錄的日子平均攝取，供改善建議比對 */
+export async function recentIntake(db: Db, user: Pick<SessionUser, "id" | "timezone">) {
+  return intakeAverage(db, user.id, daysAgoLocal(user.timezone, 6), toLocalDate(new Date(), user.timezone));
 }

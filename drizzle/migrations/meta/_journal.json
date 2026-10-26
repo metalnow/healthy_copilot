@@ -50,6 +50,13 @@
       "when": 1792738277976,
       "tag": "0006_report_redacted_text",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792981146152,
+      "tag": "0007_health_follow_ups",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,7 @@ const part = (overrides: Partial<LabExtraction>): LabExtraction => ({
   reportDate: null,
   institution: null,
   items: [],
+  followUps: [],
   notes: null,
   ...overrides,
 });
@@ -35,6 +36,19 @@ describe("mergeLabExtractions", () => {
     expect(merged.isHealthReport).toBe(true);
     expect(merged.items.map((i) => i.code)).toEqual(["WEIGHT", "TG", "HBSAG"]);
     expect(merged.notes).toBe("第 2 頁模糊");
+  });
+
+  it("同一部位的超音波只留一筆，保留較完整的描述；追蹤建議去重", () => {
+    const follow = { finding: "脂肪肝", action: "定期追蹤", department: "肝膽腸胃科", intervalMonths: null, page: 3 };
+    const merged = mergeLabExtractions([
+      part({ items: [item("ULTRASOUND", "腹部超音波(ABD Ultrasound)", null, "脂肪肝")], followUps: [follow] }),
+      part({
+        items: [item("OTHER", "腹部超音波", null, "輕度脂肪肝，膽囊息肉 0.3 cm"), item("ULTRASOUND", "攝護腺超音波", null, "正常")],
+        followUps: [follow],
+      }),
+    ]);
+    expect(merged.items.map((i) => i.textValue)).toEqual(["輕度脂肪肝，膽囊息肉 0.3 cm", "正常"]);
+    expect(merged.followUps).toHaveLength(1);
   });
 
   it("依頁數切批", () => {

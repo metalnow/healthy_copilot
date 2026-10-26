@@ -14,6 +14,8 @@ import {
   DRINK_TYPES,
   EXERCISE_TYPES,
   GOAL_DIRECTIONS,
+  FOLLOW_UP_SOURCES,
+  FOLLOW_UP_STATUSES,
   GOAL_STATUSES,
   HEALTH_DOCUMENT_STATUSES,
   INPUT_TYPES,
@@ -295,6 +297,32 @@ export const healthGoals = sqliteTable("health_goals", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/** 健檢後的追蹤事項：報告建議的複檢、回診，或描述性檢查（超音波等）的異常發現 */
+export const healthFollowUps = sqliteTable(
+  "health_follow_ups",
+  {
+    id: id(),
+    userId: userId(),
+    finding: text("finding").notNull(),
+    action: text("action").notNull(),
+    department: text("department"),
+    /** 關聯的檢驗項目分組 key，例如 ULTRASOUND:腹部超音波 */
+    labKey: text("lab_key"),
+    sourceDocumentId: text("source_document_id").references(() => healthDocuments.id),
+    /** 發現的日期（報告日期） */
+    foundAt: text("found_at"),
+    /** 建議或預約的追蹤日期 */
+    dueDate: text("due_date"),
+    status: text("status", { enum: FOLLOW_UP_STATUSES }).notNull().default("open"),
+    completedAt: text("completed_at"),
+    note: text("note"),
+    source: text("source", { enum: FOLLOW_UP_SOURCES }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("health_follow_ups_user_idx").on(t.userId, t.status)],
+);
 
 // ─── 每日紀錄 ──────────────────────────────────────────────
 

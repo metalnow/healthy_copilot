@@ -3,6 +3,7 @@ import {
   FoodEstimateSchema,
   FoodPhotoResultSchema,
   LabExtractionSchema,
+  StoredLabExtractionSchema,
   MedicationLabelSchema,
   ReviewOutputSchema,
   SleepScreenshotSchema,
@@ -43,6 +44,7 @@ const AI_SCHEMAS = {
   SleepScreenshotSchema,
   ReviewOutputSchema,
   LabExtractionSchema,
+  StoredLabExtractionSchema,
 };
 
 describe("AI 輸出 schema 複雜度", () => {
@@ -94,5 +96,23 @@ describe("沒有值的表示方式", () => {
     expect(parsed.unparsed).toBeNull();
     expect(event).toMatchObject({ localTime: null, mealType: null, satiety: null, drinkType: null, volumeMl: null, weightKg: null, severity: null, note: null });
     expect(event.items[0].portion).toBeNull();
+  });
+});
+
+describe("StoredLabExtractionSchema", () => {
+  it("可以讀回 transform 後存下的結果，舊資料沒有 followUps", () => {
+    const output = LabExtractionSchema.parse({
+      isHealthReport: true,
+      reportDate: "2026-08-10",
+      institution: null,
+      items: [],
+      followUps: [{ finding: "脂肪肝", action: "定期追蹤", department: "", intervalMonths: 0, page: 3 }],
+      notes: null,
+    });
+    expect(output.followUps[0]).toMatchObject({ department: null, intervalMonths: null });
+    expect(StoredLabExtractionSchema.safeParse(JSON.parse(JSON.stringify(output))).success).toBe(true);
+    const old: Partial<typeof output> = { ...output };
+    delete old.followUps;
+    expect(StoredLabExtractionSchema.parse(old).followUps).toEqual([]);
   });
 });
