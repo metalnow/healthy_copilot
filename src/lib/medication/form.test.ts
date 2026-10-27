@@ -70,4 +70,16 @@ describe("parseMedicationForm", () => {
     );
     expect(!result.ok && result.fieldErrors.localTime).toBe("服用時間或星期設定不正確");
   });
+
+  it("需要時才吃：不需要服用時間，也不建立排程", () => {
+    const result = parseMedicationForm(
+      form([
+        ["name", "普拿疼"],
+        ["category", "otc"],
+        ["asNeeded", "1"],
+        ["localTime", "08:00"],
+      ]),
+    );
+    expect(result.ok && result.schedules).toEqual([]);
+  });
 });

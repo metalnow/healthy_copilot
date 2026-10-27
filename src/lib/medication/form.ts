@@ -39,11 +39,13 @@ export function parseMedicationForm(
   const days = [...new Set(formStrings(formData, "daysOfWeek").map(Number))].sort();
   const daysOfWeek = days.length === 0 || days.length === 7 ? undefined : days;
 
-  const times = [...new Set(formStrings(formData, "localTime"))].sort();
+  // 需要時才吃（不固定時間）：沒有排程，服用時另外記錄
+  const asNeeded = formString(formData, "asNeeded") === "1";
+  const times = asNeeded ? [] : [...new Set(formStrings(formData, "localTime"))].sort();
   const schedules = times.map((localTime) =>
     MedicationScheduleSchema.safeParse({ localTime, daysOfWeek }),
   );
-  if (times.length === 0) fieldErrors.localTime = "請至少設定一個服用時間";
+  if (times.length === 0 && !asNeeded) fieldErrors.localTime = "請至少設定一個服用時間";
   else if (times.length > 6) fieldErrors.localTime = "每天最多 6 個服用時間";
   else if (schedules.some((s) => !s.success)) fieldErrors.localTime = "服用時間或星期設定不正確";
 

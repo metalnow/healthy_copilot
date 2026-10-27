@@ -170,6 +170,7 @@ const PAGE_TIPS: { prefix: string; text: string; mood?: AssistantMood }[] = [
   { prefix: "/log/ai", text: "照片可以加一句感受，例如「吃完很撐」，分析時更能對照熱量和飽足感。" },
   { prefix: "/nutrition", text: "熱量是 AI 估算值，點進紀錄就可以自己修改喔。" },
   { prefix: "/medications", text: "可以拍藥袋或包裝，我幫你帶入品名和劑量。" },
+  { prefix: "/log/medication", text: "臨時吃的藥、或份量和平常不同時在這裡記錄；沒有的品項可以直接新增喔。" },
 ];
 
 export function pageTip(pathname: string): AssistantMessage | null {

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { medicationEvents, medications, medicationSchedules } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
@@ -9,6 +9,7 @@ import {
   type ScheduleForChecklist,
 } from "@/lib/medication/checklist";
 import type { MedicationInput, MedicationScheduleInput } from "@/lib/schemas/medication";
+import { toLocalDate } from "@/lib/time";
 
 export type MedicationWithSchedules = typeof medications.$inferSelect & {
   schedules: (typeof medicationSchedules.$inferSelect)[];
@@ -227,6 +228,65 @@ export async function clearMedicationEvent(
         eq(medicationEvents.localDate, localDate),
       ),
     )
+    .returning({ id: medicationEvents.id });
+  return deleted.length > 0;
+}
+
+// ─── 臨時服用紀錄（不在排程內，或需要時才吃的品項） ──────────────
+
+/** 記錄某次服用：品項、時間與實際的量 */
+export async function logMedicationIntake(
+  db: Db,
+  user: Pick<SessionUser, "id" | "timezone">,
+  input: { medicationId: string; takenAt: Date; dose?: number },
+) {
+  const [med] = await db
+    .select({ id: medications.id })
+    .from(medications)
+    .where(and(eq(medications.id, input.medicationId), eq(medications.userId, user.id)))
+    .limit(1);
+  if (!med) return null;
+  const [row] = await db
+    .insert(medicationEvents)
+    .values({
+      userId: user.id,
+      medicationId: med.id,
+      takenAt: input.takenAt.toISOString(),
+      localDate: toLocalDate(input.takenAt, user.timezone),
+      timezone: user.timezone,
+      status: "taken",
+      actualDose: input.dose ?? null,
+    })
+    .returning({ id: medicationEvents.id });
+  return row.id;
+}
+
+/** 某天的臨時服用紀錄（排程內的打勾不含在內） */
+export async function listIntakesForDate(db: Db, userId: string, localDate: string) {
+  return db
+    .select({
+      id: medicationEvents.id,
+      name: medications.name,
+      unit: medications.unit,
+      dose: medicationEvents.actualDose,
+      takenAt: medicationEvents.takenAt,
+    })
+    .from(medicationEvents)
+    .innerJoin(medications, eq(medicationEvents.medicationId, medications.id))
+    .where(
+      and(
+        eq(medicationEvents.userId, userId),
+        eq(medicationEvents.localDate, localDate),
+        isNull(medicationEvents.scheduleId),
+      ),
+    )
+    .orderBy(asc(medicationEvents.takenAt));
+}
+
+export async function deleteMedicationEvent(db: Db, userId: string, id: string) {
+  const deleted = await db
+    .delete(medicationEvents)
+    .where(and(eq(medicationEvents.id, id), eq(medicationEvents.userId, userId)))
     .returning({ id: medicationEvents.id });
   return deleted.length > 0;
 }

@@ -5,11 +5,15 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db";
 import { recordAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/dal";
-import { formString, type ActionState } from "@/lib/form";
+import { formNumber, formString, type ActionState } from "@/lib/form";
+import { parseOccurredAt } from "@/lib/measurement-form";
 import { parseMedicationForm } from "@/lib/medication/form";
+import { MedicationSchema } from "@/lib/schemas/medication";
 import {
   createMedication,
   deleteMedication,
+  deleteMedicationEvent,
+  logMedicationIntake,
   setMedicationActive,
   updateMedication,
 } from "@/server/medications";
@@ -79,4 +83,55 @@ export async function removeMedication(formData: FormData) {
     await recordAudit(db, { userId: user.id, action: "medication.delete", entityId: id });
   }
   redirect("/medications");
+}
+
+/** 記錄服用了什麼、多少量（不在排程內、或需要時才吃的品項）；也可以順便新增品項 */
+export async function saveIntake(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const fieldErrors: Record<string, string> = {};
+  const time = parseOccurredAt(formString(formData, "takenAt"), user.timezone, new Date());
+  if ("error" in time) fieldErrors.takenAt = time.error;
+  const dose = formNumber(formData, "dose");
+  if (dose !== undefined && (Number.isNaN(dose) || dose <= 0 || dose > 10000)) fieldErrors.dose = "份量必須是大於 0 的數字";
+
+  const medicationId = formString(formData, "medicationId");
+  const newName = formString(formData, "newName")?.slice(0, 100);
+  if (medicationId === "new" ? !newName : !medicationId) {
+    fieldErrors[medicationId === "new" ? "newName" : "medicationId"] = medicationId === "new" ? "請輸入名稱" : "請選擇品項";
+  }
+  if (Object.keys(fieldErrors).length > 0 || "error" in time) return { fieldErrors };
+
+  const db = await getDb();
+  let id = medicationId!;
+  if (medicationId === "new") {
+    const category = MedicationSchema.shape.category.safeParse(formString(formData, "category"));
+    // 新品項預設為「需要時才吃」（沒有排程），之後可以在用藥管理改成固定時間
+    id = await createMedication(
+      db,
+      user.id,
+      {
+        name: newName!,
+        category: category.success ? category.data : "supplement",
+        unit: formString(formData, "unit")?.slice(0, 20),
+        active: true,
+      },
+      [],
+    );
+    await recordAudit(db, { userId: user.id, action: "medication.create", entityId: id });
+  }
+  const eventId = await logMedicationIntake(db, user, { medicationId: id, takenAt: time.occurredAt, dose });
+  if (!eventId) return { fieldErrors: { medicationId: "找不到這個品項" } };
+  await recordAudit(db, { userId: user.id, action: "medication_event.log", entityId: eventId });
+  redirect("/");
+}
+
+export async function removeIntake(formData: FormData) {
+  const user = await requireUser();
+  const id = formString(formData, "id");
+  if (!id) return;
+  const db = await getDb();
+  if (await deleteMedicationEvent(db, user.id, id)) {
+    await recordAudit(db, { userId: user.id, action: "medication_event.delete", entityId: id });
+  }
+  revalidatePath("/");
 }

@@ -41,6 +41,7 @@ export const DELETABLE_KINDS = [
   "activity",
   "exercise",
   "symptom",
+  "medication_event",
 ] as const;
 export type DeletableKind = (typeof DELETABLE_KINDS)[number];
 
@@ -94,6 +95,9 @@ export async function getTimeline(
         status: medicationEvents.status,
         takenAt: medicationEvents.takenAt,
         scheduledAt: medicationEvents.scheduledAt,
+        scheduleId: medicationEvents.scheduleId,
+        dose: medicationEvents.actualDose,
+        unit: medications.unit,
         name: medications.name,
       })
       .from(medicationEvents)
@@ -180,11 +184,16 @@ export async function getTimeline(
       return {
         key: `med:${m.id}`,
         category: "medication" as const,
+        // 排程內的打勾在今日頁「復原」；另外記錄的服用可以直接刪除
+        ...(m.scheduleId === null && { deleteKind: "medication_event" as const }),
         id: m.id,
         localDate: m.localDate,
         ...(at ? timed(at) : { occurredAt: null, time: null }),
         title: m.name,
-        detail: MEDICATION_STATUS_LABELS[m.status],
+        detail: join(
+          MEDICATION_STATUS_LABELS[m.status],
+          m.status !== "skipped" && m.dose !== null && `${m.dose}${m.unit ? ` ${m.unit}` : ""}`,
+        ),
         ai: false,
       };
     }),

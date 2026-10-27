@@ -37,7 +37,7 @@ import { formatDuration, sleepDurationMin } from "@/lib/sleep";
 import { toLocalDate } from "@/lib/time";
 import { listDrinksForDate, listFoodForDate } from "@/server/food";
 import { lifestyleForRange, recentSymptoms, type SymptomRow } from "@/server/lifestyle";
-import { getChecklist } from "@/server/medications";
+import { getChecklist, listIntakesForDate } from "@/server/medications";
 import {
   latestObservations,
   listObservationsForDate,
@@ -145,12 +145,13 @@ export default async function TodayPage() {
   const today = toLocalDate(new Date(), user.timezone);
   const db = await getDb();
 
-  const [latest, todayObservations, food, drinks, checklist, lifestyle, symptoms, entries, week, review] = await Promise.all([
+  const [latest, todayObservations, food, drinks, checklist, intakes, lifestyle, symptoms, entries, week, review] = await Promise.all([
     latestObservations(db, user.id),
     listObservationsForDate(db, user.id, today),
     listFoodForDate(db, user.id, today),
     listDrinksForDate(db, user.id, today),
     getChecklist(db, user.id, today),
+    listIntakesForDate(db, user.id, today),
     lifestyleForRange(db, user.id, today, today),
     recentSymptoms(db, user.id),
     getTimeline(db, user, today, today),
@@ -324,7 +325,7 @@ export default async function TodayPage() {
         </Link>
       )}
 
-      <MedicationChecklist items={checklist} localDate={today} timeZone={user.timezone} />
+      <MedicationChecklist items={checklist} intakes={intakes} localDate={today} timeZone={user.timezone} />
 
       <section aria-labelledby="entries-heading" className="space-y-3">
         <div className="flex items-baseline justify-between">

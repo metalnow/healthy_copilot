@@ -24,8 +24,9 @@ function MedicationCard({ med }: { med: MedicationWithSchedules }) {
           <p className="font-medium">{med.name}</p>
           <p className="text-sm text-muted">{details.join("・")}</p>
           <p className="text-sm text-muted">
-            {med.schedules.map((s) => s.localTime).join("、")}
-            {med.schedules[0] && `・${daysText(med.schedules[0].daysOfWeek)}`}
+            {med.schedules.length === 0
+              ? "需要時服用"
+              : `${med.schedules.map((s) => s.localTime).join("、")}・${daysText(med.schedules[0].daysOfWeek)}`}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 text-sm">

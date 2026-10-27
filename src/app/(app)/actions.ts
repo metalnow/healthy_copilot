@@ -24,7 +24,7 @@ import {
   updateFoodEvent,
   type FoodItemDraft,
 } from "@/server/food";
-import { clearMedicationEvent, recordMedicationEvent } from "@/server/medications";
+import { clearMedicationEvent, deleteMedicationEvent, recordMedicationEvent } from "@/server/medications";
 import { deleteLifestyleEntry } from "@/server/lifestyle";
 import {
   addObservation,
@@ -258,6 +258,7 @@ export async function deleteEntry(formData: FormData) {
     activity: (d, u, i) => deleteLifestyleEntry(d, u, "activity", i),
     exercise: (d, u, i) => deleteLifestyleEntry(d, u, "exercise", i),
     symptom: (d, u, i) => deleteLifestyleEntry(d, u, "symptom", i),
+    medication_event: deleteMedicationEvent,
   };
   if (await remove[kind.data](db, user.id, id)) {
     await recordAudit(db, { userId: user.id, action: `${kind.data}.delete`, entityId: id });

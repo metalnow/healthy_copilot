@@ -41,6 +41,8 @@ export function MedicationForm({ action, defaults: initial, aiImport }: Props) {
   const errors = state.fieldErrors ?? {};
   const [defaults, setDefaults] = useState(initial);
   const [times, setTimes] = useState(() => toTimeRows(initial?.times ?? []));
+  // 編輯沒有排程的品項時，預設為「需要時才吃」
+  const [asNeeded, setAsNeeded] = useState(() => initial !== undefined && initial.times.length === 0);
   const days = new Set(defaults?.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6]);
 
   const [imported, setImported] = useState<{ extractionId: string; confidence?: number; notes?: string }>();
@@ -93,17 +95,32 @@ export function MedicationForm({ action, defaults: initial, aiImport }: Props) {
       <FormError message={state.error ?? importError} />
 
       {aiImport && (
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface px-4 py-4 text-sm transition active:scale-[0.98] has-disabled:opacity-60">
-          <Camera aria-hidden className="size-5 text-accent" />
-          {photo ? "重新拍攝或選擇" : "拍照或選擇包裝、藥袋照片"}
-          <input
-            type="file"
-            accept="image/*"
-            disabled={importing}
-            onChange={(e) => choosePhoto(e.target.files?.[0])}
-            className="sr-only"
-          />
-        </label>
+        // 有 capture 的 input 在 Android 只會開相機，所以拍照與相簿分成兩個按鈕
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: photo ? "重新拍照" : "拍包裝 / 藥袋", capture: true },
+            { label: photo ? "改選相簿照片" : "從相簿選擇", capture: false },
+          ].map((option) => (
+            <label
+              key={option.label}
+              className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface px-3 py-4 text-sm transition active:scale-[0.98] has-disabled:opacity-60"
+            >
+              {option.capture && <Camera aria-hidden className="size-5 text-accent" />}
+              {option.label}
+              <input
+                type="file"
+                accept="image/*"
+                capture={option.capture ? "environment" : undefined}
+                disabled={importing}
+                onChange={(e) => {
+                  choosePhoto(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+                className="sr-only"
+              />
+            </label>
+          ))}
+        </div>
       )}
       {photo && (
         <div className="space-y-3">
@@ -182,72 +199,98 @@ export function MedicationForm({ action, defaults: initial, aiImport }: Props) {
           />
         </Field>
 
-        <div className="space-y-2">
-          <span className="block text-sm font-medium">每天服用時間</span>
-          <ul className="space-y-2">
-            {times.map((time, index) => (
-              <li key={time.key} className="flex gap-2">
-                <input
-                  name="localTime"
-                  type="time"
-                  value={time.value}
-                  onChange={(e) =>
-                    setTimes((current) =>
-                      current.map((t) => (t.key === time.key ? { ...t, value: e.target.value } : t)),
-                    )
-                  }
-                  aria-label={`第 ${index + 1} 個服用時間`}
-                  className={inputClass}
-                />
-                {times.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setTimes((current) => current.filter((t) => t.key !== time.key))}
-                    aria-label={`移除第 ${index + 1} 個服用時間`}
-                    className="px-2 text-muted"
-                  >
-                    ✕
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {times.length < 6 && (
-            <button
-              type="button"
-              onClick={() => setTimes((current) => [...current, { key: nextKey++, value: "21:00" }])}
-              className="text-sm text-accent"
-            >
-              ＋ 新增時間
-            </button>
-          )}
-          {errors.localTime && (
-            <p role="alert" className="text-sm text-warning">
-              {errors.localTime}
-            </p>
-          )}
-        </div>
-
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">星期</legend>
-          <div className="flex flex-wrap gap-2">
-            {WEEKDAY_LABELS.map((label, day) => (
-              <label key={day} className="cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="daysOfWeek"
-                  value={day}
-                  defaultChecked={days.has(day)}
-                  className="peer sr-only"
-                />
-                <span className="block size-9 rounded-full border border-border text-center leading-9 text-sm peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40">
-                  {label}
-                </span>
-              </label>
+          <legend className="text-sm font-medium">服用方式</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: false, label: "每天固定時間", hint: "今日頁會列出待服用" },
+              { value: true, label: "需要時才吃", hint: "吃了再到今日頁記錄" },
+            ].map((option) => (
+              <button
+                key={String(option.value)}
+                type="button"
+                aria-pressed={asNeeded === option.value}
+                onClick={() => setAsNeeded(option.value)}
+                className="rounded-xl border border-border px-3 py-2 text-left text-sm aria-pressed:border-accent aria-pressed:bg-accent/10"
+              >
+                <span className="block font-medium">{option.label}</span>
+                <span className="text-xs text-muted">{option.hint}</span>
+              </button>
             ))}
           </div>
-          <p className="text-xs text-muted">全選或都不選代表每天</p>
+          <input type="hidden" name="asNeeded" value={asNeeded ? "1" : ""} />
         </fieldset>
+
+        {!asNeeded && (
+          <>
+            <div className="space-y-2">
+              <span className="block text-sm font-medium">每天服用時間</span>
+              <ul className="space-y-2">
+                {times.map((time, index) => (
+                  <li key={time.key} className="flex gap-2">
+                    <input
+                      name="localTime"
+                      type="time"
+                      value={time.value}
+                      onChange={(e) =>
+                        setTimes((current) =>
+                          current.map((t) => (t.key === time.key ? { ...t, value: e.target.value } : t)),
+                        )
+                      }
+                      aria-label={`第 ${index + 1} 個服用時間`}
+                      className={inputClass}
+                    />
+                    {times.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setTimes((current) => current.filter((t) => t.key !== time.key))}
+                        aria-label={`移除第 ${index + 1} 個服用時間`}
+                        className="px-2 text-muted"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {times.length < 6 && (
+                <button
+                  type="button"
+                  onClick={() => setTimes((current) => [...current, { key: nextKey++, value: "21:00" }])}
+                  className="text-sm text-accent"
+                >
+                  ＋ 新增時間
+                </button>
+              )}
+              {errors.localTime && (
+                <p role="alert" className="text-sm text-warning">
+                  {errors.localTime}
+                </p>
+              )}
+            </div>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">星期</legend>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAY_LABELS.map((label, day) => (
+                  <label key={day} className="cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="daysOfWeek"
+                      value={day}
+                      defaultChecked={days.has(day)}
+                      className="peer sr-only"
+                    />
+                    <span className="block size-9 rounded-full border border-border text-center leading-9 text-sm peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40">
+                      {label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted">全選或都不選代表每天</p>
+            </fieldset>
+          </>
+        )}
       </div>
 
       <SubmitButton>儲存</SubmitButton>
