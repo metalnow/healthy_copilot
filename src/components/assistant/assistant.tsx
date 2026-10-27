@@ -113,6 +113,13 @@ export function Assistant() {
     return () => clearTimeout(timer);
   }, [waving]);
 
+  // 提醒都看完時只顯示一下「都看完了」就自動收起
+  useEffect(() => {
+    if (!open || current) return;
+    const timer = setTimeout(() => setOpen(false), 2500);
+    return () => clearTimeout(timer);
+  }, [open, current]);
+
   const acknowledge = (message: AssistantMessage) => {
     // 只保留最近 200 筆（id 含日期，舊的自然不會再出現）
     if (message.id.startsWith("tip:")) setSeenTips([...seenTips, message.id]);
