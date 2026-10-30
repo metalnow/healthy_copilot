@@ -17,6 +17,8 @@ export const DraftFoodItemSchema = z.object({
   /** 使用者修改品名或份量後，前端會移除估算值 */
   nutrition: NutritionEstimateSchema.optional(),
   confidence: Confidence.optional(),
+  /** 照片中看不到、AI 依容器推測的品項（例如碗底的飯），確認畫面特別標示 */
+  inferred: z.boolean().optional(),
 });
 export type DraftFoodItem = z.infer<typeof DraftFoodItemSchema>;
 
@@ -96,7 +98,7 @@ export function toNutrition(item: Pick<AiFoodItem, "nutrition">): NutritionEstim
   return { estimated: true, ...Object.fromEntries(entries) };
 }
 
-function toDraftItems(items: AiFoodItem[]): DraftFoodItem[] {
+function toDraftItems(items: (AiFoodItem & { inferred?: boolean })[]): DraftFoodItem[] {
   return items
     .filter((item) => item.name.trim() !== "")
     .map((item) => ({
@@ -104,6 +106,7 @@ function toDraftItems(items: AiFoodItem[]): DraftFoodItem[] {
       portion: item.portion?.trim().slice(0, 50) || undefined,
       nutrition: toNutrition(item),
       confidence: clamp01(item.confidence),
+      ...(item.inferred && { inferred: true }),
     }));
 }
 

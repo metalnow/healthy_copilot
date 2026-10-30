@@ -50,6 +50,12 @@ export const AiFoodItemSchema = z.strictObject({
 });
 export type AiFoodItem = z.output<typeof AiFoodItemSchema>;
 
+/** 照片辨識的品項：多一個「照片中看不到、依容器推測」的標記 */
+export const AiPhotoFoodItemSchema = AiFoodItemSchema.extend({
+  inferred: z.boolean().describe("照片中看不到、依容器深度或菜色推測可能在下方的品項（例如碗底的飯、湯下的麵）為 true"),
+});
+export type AiPhotoFoodItem = z.output<typeof AiPhotoFoodItemSchema>;
+
 export const FoodEstimateSchema = z.strictObject({
   items: z
     .array(z.strictObject({ nutrition: AiNutritionSchema, confidence: z.number().describe("估算信心 0–1") }))
@@ -72,8 +78,10 @@ export type AiDrinkItem = z.output<typeof AiDrinkItemSchema>;
 export const FoodPhotoResultSchema = z.strictObject({
   isFood: z.boolean().describe("照片中是否有食物或飲料"),
   mealType: enumOrNone(MEAL_TYPES).describe("依內容推測的餐別，無法判斷填 none"),
-  items: z.array(AiFoodItemSchema).describe("食物品項，不含飲料"),
+  items: z.array(AiPhotoFoodItemSchema).describe("食物品項，不含飲料"),
   drinks: z.array(AiDrinkItemSchema).describe("飲料，每杯 / 每瓶一筆"),
+  containerEstimate: text().describe("碗盤大小與深度的推估及依據（例如與筷子、湯匙比對）；不需要時填空字串"),
+  hiddenQuestion: text().describe("看不到容器下方、需要使用者確認時要問的一句話；不需要時填空字串"),
   overallConfidence: z.number().describe("整體信心 0–1"),
   satiety: positive().describe("使用者說明中的飽足感 1–5；沒提到填 0"),
   feeling: text().describe("使用者說明中對這餐的感受（精簡原話）；沒有填空字串"),

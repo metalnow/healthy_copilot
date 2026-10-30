@@ -41,6 +41,7 @@ import {
   failExtraction,
   isOverHourlyLimit,
 } from "./extractions";
+import { foodPhotoPersonalization } from "./food-feedback";
 import { getModelProfile } from "./model-profiles";
 
 export type SleepDraft = {
@@ -76,6 +77,8 @@ export type AiTaskResult = {
   activity?: ActivityDraft;
   /** 藥品 / 保健品照片的擷取結果（task = medication_label） */
   medication?: MedicationDraft;
+  /** 照片看不到容器下方時，想請使用者確認的問題（task = food_vision） */
+  foodQuestion?: string;
   /** 手動輸入品項的營養估算，順序與送出的品項相同（task = food_estimate） */
   foodNutrition?: { nutrition?: NutritionEstimate; confidence: number }[];
   confidence?: number;
@@ -159,6 +162,9 @@ export async function analyzeFoodPhoto(
 ): Promise<AiTaskResult> {
   const mediaId = await putMedia(db, env.MEDIA, user.id, { kind: "food_photo", ...photo });
 
+  // 個人化：使用者寫的飲食習慣與過去的修正（不含身分資訊）
+  const { context: personal } = await foodPhotoPersonalization(db, user.id);
+
   return runTask(db, env, user, { task: "food_vision", primaryProfile: "vision", mediaIds: [mediaId] }, async ({ config, steps }) => {
     const profile = await getModelProfile(db, "vision");
     const response = await generateStructured(config, {
@@ -169,6 +175,7 @@ export async function analyzeFoodPhoto(
         { type: "text", text: "請辨識這張照片中的食物與飲料。" },
         { type: "image_url", image_url: { url: `data:${photo.mimeType};base64,${toBase64(photo.bytes)}` } },
         ...(note ? [{ type: "text" as const, text: `使用者補充說明：${note}` }] : []),
+        ...(personal ? [{ type: "text" as const, text: personal }] : []),
       ],
       schema: FoodPhotoResultSchema,
       schemaName: "food_photo",
@@ -179,9 +186,15 @@ export async function analyzeFoodPhoto(
     return {
       result: {
         drafts: draftFromFoodPhoto(response.data, now, user.timezone),
-        notes: response.data.isFood ? (response.data.notes ?? undefined) : "照片中看起來沒有食物或飲料。",
+        notes: response.data.isFood
+          ? [response.data.notes, response.data.containerEstimate && `容器推估：${response.data.containerEstimate}`]
+              .filter(Boolean)
+              .join("\n") || undefined
+          : "照片中看起來沒有食物或飲料。",
+        foodQuestion: (response.data.isFood && response.data.hiddenQuestion) || undefined,
       },
-      parsedOutput: { ...response.data, mediaId },
+      // 保留使用者的補充說明，之後比對修正時參考
+      parsedOutput: { ...response.data, mediaId, userNote: note ?? null },
       rawOutput: response.raw,
       confidence: response.data.overallConfidence,
     };

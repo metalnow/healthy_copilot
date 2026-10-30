@@ -58,3 +58,34 @@ export async function updateAiLogging(formData: FormData) {
   await recordAudit(db, { userId: user.id, action: "settings.ai_log_raw_content", metadata: { enabled } });
   revalidatePath("/settings/ai");
 }
+
+/** 照片辨識的個人化：使用者自己寫的飲食習慣 */
+export async function updateFoodPhotoHints(
+  _prev: ActionState & { saved?: boolean },
+  formData: FormData,
+): Promise<ActionState & { saved?: boolean }> {
+  const user = await requireUser();
+  const hints = formString(formData, "hints") ?? null;
+  if (hints && hints.length > 500) return { error: "最多 500 字" };
+  const db = await getDb();
+  await db
+    .insert(userSettings)
+    .values({ userId: user.id, foodPhotoHints: hints })
+    .onConflictDoUpdate({ target: userSettings.userId, set: { foodPhotoHints: hints, updatedAt: new Date() } });
+  // 稽核紀錄不含內容
+  await recordAudit(db, { userId: user.id, action: "settings.food_photo_hints" });
+  revalidatePath("/settings/ai");
+  return { saved: true };
+}
+
+export async function updateFoodPhotoLearning(formData: FormData) {
+  const user = await requireUser();
+  const enabled = formString(formData, "enabled") === "true";
+  const db = await getDb();
+  await db
+    .insert(userSettings)
+    .values({ userId: user.id, foodPhotoLearning: enabled })
+    .onConflictDoUpdate({ target: userSettings.userId, set: { foodPhotoLearning: enabled, updatedAt: new Date() } });
+  await recordAudit(db, { userId: user.id, action: "settings.food_photo_learning", metadata: { enabled } });
+  revalidatePath("/settings/ai");
+}

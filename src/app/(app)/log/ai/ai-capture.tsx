@@ -78,12 +78,18 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
     setError(undefined);
   };
 
-  const analyzePhoto = () => {
+  /** answer：確認畫面中對「碗底下有什麼」的補充，接在原本的說明後面重新分析 */
+  const analyzePhoto = (answer?: string) => {
     if (!photo) return;
-    run("AI 辨識照片中…", () => {
+    const note = [photoNote.trim(), answer].filter(Boolean).join("；").slice(0, 500);
+    if (answer) {
+      setPhotoNote(note);
+      setResult(undefined);
+    }
+    run(answer ? "依你的說明重新分析中…" : "AI 辨識照片中…", () => {
       const form = new FormData();
       form.set("photo", new File([photo], "food.jpg", { type: "image/jpeg" }));
-      if (photoNote.trim()) form.set("note", photoNote.trim());
+      if (note) form.set("note", note);
       return postAi("/api/ai/food-photo", form);
     });
   };
@@ -113,7 +119,11 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
           // eslint-disable-next-line @next/next/no-img-element -- 本機 blob 預覽，不經過 next/image
           <img src={preview} alt="上傳的照片" className="max-h-56 w-full rounded-xl object-cover" />
         )}
-        <DraftEditor result={result} onReset={reset} />
+        <DraftEditor
+          result={result}
+          onReset={reset}
+          onReanalyze={result.task === "food_vision" && photo ? (answer) => analyzePhoto(answer) : undefined}
+        />
       </div>
     );
   }
@@ -191,7 +201,7 @@ export function AiCapture({ configured, initialMode }: { configured: boolean; in
               />
               <button
                 type="button"
-                onClick={analyzePhoto}
+                onClick={() => analyzePhoto()}
                 className="w-full rounded-xl bg-accent px-4 py-3 font-medium text-accent-foreground transition active:scale-[0.98]"
               >
                 AI 分析

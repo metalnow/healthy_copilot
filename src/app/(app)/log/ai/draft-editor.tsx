@@ -115,8 +115,10 @@ function FoodItems({
               onChange={(nutrition) => onChange(items.map((it, i) => (i === index ? { ...it, nutrition } : it)))}
               label={`第 ${index + 1} 項熱量`}
             />
-            {item.confidence !== undefined && item.confidence < LOW_CONFIDENCE && (
-              <ConfidenceBadge confidence={item.confidence} />
+            {item.inferred ? (
+              <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">推測：照片看不到，請確認</span>
+            ) : (
+              item.confidence !== undefined && item.confidence < LOW_CONFIDENCE && <ConfidenceBadge confidence={item.confidence} />
             )}
           </div>
         </div>
@@ -363,7 +365,82 @@ function toDraftEvent(editable: EditableEvent): DraftEvent {
   return draft.kind === "food" ? { ...draft, items: draft.items.filter((i) => i.name.trim() !== "") } : draft;
 }
 
-export function DraftEditor({ result, onReset }: { result: AiTaskResult; onReset: () => void }) {
+/** AI 看不到容器下方時的確認：照推測、下面沒有、或補充說明後重新分析 */
+function HiddenFoodQuestion({
+  question,
+  hasInferred,
+  onKeep,
+  onRemove,
+  onExplain,
+  disabled,
+}: {
+  question: string;
+  hasInferred: boolean;
+  onKeep: () => void;
+  onRemove: () => void;
+  onExplain?: (answer: string) => void;
+  disabled: boolean;
+}) {
+  const [answer, setAnswer] = useState("");
+  const [explaining, setExplaining] = useState(false);
+  return (
+    <div className="space-y-3 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
+      <p>
+        <span className="font-medium">想確認一下：</span>
+        {question}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {hasInferred && (
+          <>
+            <button type="button" onClick={onKeep} className="rounded-full border border-border bg-surface px-3 py-1.5">
+              沒錯，照推測
+            </button>
+            <button type="button" onClick={onRemove} className="rounded-full border border-border bg-surface px-3 py-1.5">
+              下面沒有其他食物
+            </button>
+          </>
+        )}
+        {onExplain && !explaining && (
+          <button type="button" onClick={() => setExplaining(true)} className="rounded-full border border-accent px-3 py-1.5 text-accent">
+            我來說明
+          </button>
+        )}
+      </div>
+      {explaining && onExplain && (
+        <div className="space-y-2">
+          <textarea
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            rows={2}
+            maxLength={200}
+            placeholder="例如：下面有大概半碗飯、麵在湯底下約一球"
+            aria-label="補充說明碗裡的內容"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            disabled={disabled || !answer.trim()}
+            onClick={() => onExplain(answer.trim())}
+            className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-accent-foreground disabled:opacity-60"
+          >
+            依說明重新分析
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function DraftEditor({
+  result,
+  onReset,
+  onReanalyze,
+}: {
+  result: AiTaskResult;
+  onReset: () => void;
+  /** 照片辨識：使用者補充說明後重新分析（傳入補充內容） */
+  onReanalyze?: (answer: string) => void;
+}) {
   const [events, setEvents] = useState<EditableEvent[]>(() =>
     result.drafts.map((d) => ({ ...d, key: nextKey++, include: true })),
   );
@@ -384,6 +461,29 @@ export function DraftEditor({ result, onReset }: { result: AiTaskResult; onReset
       onReset();
     });
 
+  // 照片看不到容器下方時的確認
+  const [questionDone, setQuestionDone] = useState(false);
+  const hasInferred = events.some((e) => e.kind === "food" && e.items.some((i) => i.inferred));
+  const resolveInferred = (keep: boolean) => {
+    setEvents((current) =>
+      current.map((e) => {
+        if (e.kind !== "food") return e;
+        const items = keep
+          ? e.items.map((i) => (i.inferred ? { ...i, inferred: undefined } : i))
+          : e.items.filter((i) => !i.inferred);
+        return { ...e, items, include: e.include && items.length > 0 };
+      }),
+    );
+    setQuestionDone(true);
+  };
+  const explain = onReanalyze
+    ? (answer: string) =>
+        startTransition(async () => {
+          await discardAiDraft(result.extractionId);
+          onReanalyze(answer);
+        })
+    : undefined;
+
   return (
     <div className="space-y-4">
       {result.transcript !== undefined && result.transcript !== "" && (
@@ -392,7 +492,17 @@ export function DraftEditor({ result, onReset }: { result: AiTaskResult; onReset
           {result.transcript}
         </p>
       )}
-      {result.notes && <p className="text-sm text-muted">{result.notes}</p>}
+      {result.notes && <p className="text-sm whitespace-pre-line text-muted">{result.notes}</p>}
+      {result.foodQuestion && !questionDone && (
+        <HiddenFoodQuestion
+          question={result.foodQuestion}
+          hasInferred={hasInferred}
+          onKeep={() => resolveInferred(true)}
+          onRemove={() => resolveInferred(false)}
+          onExplain={explain}
+          disabled={pending}
+        />
+      )}
       {result.unparsed && (
         <p className="text-sm text-muted">
           未能歸類的內容：{result.unparsed}

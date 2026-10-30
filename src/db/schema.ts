@@ -143,6 +143,10 @@ export const userSettings = sqliteTable("user_settings", {
   backupIncludeMedia: bool("backup_include_media").notNull().default(false),
   /** AI request log 是否保存原始健康內容（預設不保存） */
   aiLogRawContent: bool("ai_log_raw_content").notNull().default(false),
+  /** 照片辨識的個人化：使用者自己寫的飲食習慣（例如常用的碗大小） */
+  foodPhotoHints: text("food_photo_hints"),
+  /** 是否參考過去對照片辨識的修正 */
+  foodPhotoLearning: bool("food_photo_learning").notNull().default(true),
   updatedAt: updatedAt(),
 });
 

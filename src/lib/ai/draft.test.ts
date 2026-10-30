@@ -165,15 +165,40 @@ describe("draftFromTextParse：運動與症狀", () => {
 });
 
 describe("draftFromFoodPhoto", () => {
+  const photoItem = (name: string, kcal: number | null = null, inferred = false) => ({ ...item(name, kcal), inferred });
+
+  it("推測的品項（照片看不到）帶上 inferred 標記", () => {
+    const [draft] = draftFromFoodPhoto(
+      {
+        isFood: true,
+        mealType: "dinner",
+        items: [photoItem("滷肉", 250), photoItem("白飯", 280, true)],
+        drinks: [],
+        overallConfidence: 0.7,
+        satiety: null,
+        feeling: null,
+        notes: null,
+        containerEstimate: "碗口約 12 cm",
+        hiddenQuestion: "碗底下有飯嗎？",
+      },
+      now,
+      TZ,
+    );
+    expect(draft.kind === "food" && draft.items.map((i) => [i.name, i.inferred])).toEqual([
+      ["滷肉", undefined],
+      ["白飯", true],
+    ]);
+  });
+
   it("非食物照片回傳空陣列", () => {
     expect(
-      draftFromFoodPhoto({ isFood: false, mealType: null, items: [], drinks: [], overallConfidence: 0.9, satiety: null, feeling: null, notes: null }, now, TZ),
+      draftFromFoodPhoto({ isFood: false, mealType: null, items: [], drinks: [], overallConfidence: 0.9, satiety: null, feeling: null, notes: null, containerEstimate: null, hiddenQuestion: null }, now, TZ),
     ).toEqual([]);
   });
 
   it("照片轉成一筆飲食草稿", () => {
     const [draft] = draftFromFoodPhoto(
-      { isFood: true, mealType: "lunch", items: [item("滷雞腿", 300), item("  ")], drinks: [], overallConfidence: 1.2, satiety: null, feeling: null, notes: null },
+      { isFood: true, mealType: "lunch", items: [photoItem("滷雞腿", 300), photoItem("  ")], drinks: [], overallConfidence: 1.2, satiety: null, feeling: null, notes: null, containerEstimate: null, hiddenQuestion: null },
       now,
       TZ,
     );
@@ -195,7 +220,7 @@ describe("draftFromFoodPhoto", () => {
 
   it("飲料另外成為飲料草稿", () => {
     const drafts = draftFromFoodPhoto(
-      { isFood: true, mealType: "lunch", items: [item("排骨便當", 800)], drinks: [drink({})], overallConfidence: 0.9, satiety: null, feeling: null, notes: null },
+      { isFood: true, mealType: "lunch", items: [photoItem("排骨便當", 800)], drinks: [drink({})], overallConfidence: 0.9, satiety: null, feeling: null, notes: null, containerEstimate: null, hiddenQuestion: null },
       now,
       TZ,
     );
@@ -216,7 +241,7 @@ describe("draftFromFoodPhoto", () => {
 
   it("補充說明中的感受帶入飽足感與備註", () => {
     const [draft] = draftFromFoodPhoto(
-      { isFood: true, mealType: "dinner", items: [item("牛肉麵", 650)], drinks: [], overallConfidence: 0.8, satiety: 5.4, feeling: " 吃完很撐 ", notes: null },
+      { isFood: true, mealType: "dinner", items: [photoItem("牛肉麵", 650)], drinks: [], overallConfidence: 0.8, satiety: 5.4, feeling: " 吃完很撐 ", notes: null, containerEstimate: null, hiddenQuestion: null },
       now,
       TZ,
     );
@@ -225,7 +250,7 @@ describe("draftFromFoodPhoto", () => {
 
   it("只有飲料時不產生飲食草稿；容量不明時用預設值並降低信心", () => {
     const drafts = draftFromFoodPhoto(
-      { isFood: true, mealType: null, items: [], drinks: [drink({ drinkType: "coffee", volumeMl: null })], overallConfidence: 0.9, satiety: null, feeling: null, notes: null },
+      { isFood: true, mealType: null, items: [], drinks: [drink({ drinkType: "coffee", volumeMl: null })], overallConfidence: 0.9, satiety: null, feeling: null, notes: null, containerEstimate: null, hiddenQuestion: null },
       now,
       TZ,
     );
