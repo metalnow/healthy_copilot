@@ -241,7 +241,14 @@ export async function getTimeline(
       localDate: e.localDate,
       ...timed(e.occurredAt),
       title: EXERCISE_TYPE_LABELS[e.type],
-      detail: join(`${Math.round(e.durationMin)} 分鐘`, e.intensity && INTENSITY_LABELS[e.intensity], e.afterMeal && "飯後", e.rpe && `RPE ${e.rpe}`),
+      detail: join(
+        `${Math.round(e.durationMin)} 分鐘`,
+        e.intensity && INTENSITY_LABELS[e.intensity],
+        e.kcal != null && `${Math.round(e.kcal)} kcal`,
+        e.avgHeartRate != null && `平均心率 ${e.avgHeartRate}`,
+        e.afterMeal && "飯後",
+        e.rpe && `RPE ${e.rpe}`,
+      ),
       ai: e.extractionId !== null,
     })),
     ...lifestyle.symptoms.map((s) => ({

@@ -27,6 +27,9 @@ export default async function EditExercisePage({ params }: PageProps<"/log/exerc
           durationMin: exercise.durationMin,
           rpe: exercise.rpe ?? undefined,
           intensity: exercise.intensity ?? undefined,
+          kcal: exercise.kcal ?? undefined,
+          avgHeartRate: exercise.avgHeartRate ?? undefined,
+          maxHeartRate: exercise.maxHeartRate ?? undefined,
           afterMeal: exercise.afterMeal ?? undefined,
           note: exercise.note ?? undefined,
         }}

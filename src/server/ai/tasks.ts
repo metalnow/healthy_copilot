@@ -15,6 +15,7 @@ import {
   FOOD_PHOTO_SYSTEM_PROMPT,
   MEDICATION_LABEL_SYSTEM_PROMPT,
   ACTIVITY_SCREENSHOT_SYSTEM_PROMPT,
+  EXERCISE_SCREENSHOT_SYSTEM_PROMPT,
   SLEEP_SCREENSHOT_SYSTEM_PROMPT,
   textParseSystemPrompt,
 } from "@/lib/ai/prompts";
@@ -23,12 +24,13 @@ import {
   FoodPhotoResultSchema,
   MedicationLabelSchema,
   ActivityScreenshotSchema,
+  ExerciseScreenshotSchema,
   SleepScreenshotSchema,
   TextParseResultSchema,
 } from "@/lib/ai/schemas";
 import { generateStructured } from "@/lib/ai/structured";
 import type { NutritionEstimate } from "@/lib/schemas/common";
-import type { AI_TASKS } from "@/lib/enums";
+import type { AI_TASKS, EXERCISE_TYPES, INTENSITIES } from "@/lib/enums";
 import { WEEKDAY_LABELS } from "@/lib/labels";
 import { medicationDraftFromLabel, type MedicationDraft } from "@/lib/medication/label";
 import { resolveSleepTimes } from "@/lib/sleep";
@@ -64,6 +66,18 @@ export type ActivityDraft = {
   totalKcal?: number;
 };
 
+export type ExerciseDraft = {
+  type: (typeof EXERCISE_TYPES)[number];
+  /** datetime-local；截圖沒有時間時省略 */
+  startedAt?: string;
+  durationMin?: number;
+  intensity?: (typeof INTENSITIES)[number];
+  kcal?: number;
+  avgHeartRate?: number;
+  maxHeartRate?: number;
+  note?: string;
+};
+
 export type AiTaskResult = {
   extractionId: string;
   task: (typeof AI_TASKS)[number];
@@ -75,6 +89,8 @@ export type AiTaskResult = {
   sleep?: SleepDraft;
   /** 步數 / 活動量截圖的擷取結果（task = activity_screenshot） */
   activity?: ActivityDraft;
+  /** 單次運動截圖的擷取結果（task = exercise_screenshot） */
+  exercise?: ExerciseDraft;
   /** 藥品 / 保健品照片的擷取結果（task = medication_label） */
   medication?: MedicationDraft;
   /** 照片看不到容器下方時，想請使用者確認的問題（task = food_vision） */
@@ -352,6 +368,61 @@ export async function analyzeActivityScreenshot(
               distanceKm: round(data.distanceKm, 2),
               activeMinutes: round(data.activeMinutes),
               totalKcal: round(data.totalKcal),
+            }
+          : undefined,
+      },
+      parsedOutput: { ...data, mediaId },
+      rawOutput: response.raw,
+      confidence: data.confidence,
+    };
+  });
+}
+
+export async function analyzeExerciseScreenshot(
+  db: Db,
+  env: Env,
+  user: SessionUser,
+  image: { bytes: Uint8Array<ArrayBuffer>; mimeType: string; filename?: string },
+): Promise<AiTaskResult> {
+  const mediaId = await putMedia(db, env.MEDIA, user.id, { kind: "exercise_screenshot", ...image });
+
+  return runTask(db, env, user, { task: "exercise_screenshot", primaryProfile: "vision", mediaIds: [mediaId] }, async ({ config, steps }) => {
+    const profile = await getModelProfile(db, "vision");
+    const response = await generateStructured(config, {
+      model: profile.modelId,
+      maxTokens: profile.maxTokens,
+      system: EXERCISE_SCREENSHOT_SYSTEM_PROMPT,
+      user: [
+        { type: "text", text: "請讀出這張截圖中的運動紀錄。" },
+        { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${toBase64(image.bytes)}` } },
+      ],
+      schema: ExerciseScreenshotSchema,
+      schemaName: "exercise_screenshot",
+    });
+    steps.push({ profile: "vision", modelId: response.model, ...response.usage });
+
+    const data = response.data;
+    const today = toLocalDate(new Date(), user.timezone);
+    const date = data.startDate && /^\d{4}-\d{2}-\d{2}$/.test(data.startDate) && data.startDate <= today ? data.startDate : null;
+    const time = data.startTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(data.startTime) ? data.startTime : null;
+    const round = (n: number | null) => (n === null ? undefined : Math.round(n));
+    return {
+      result: {
+        drafts: [],
+        mediaId,
+        confidence: Math.min(1, Math.max(0, data.confidence)),
+        notes: data.isExerciseData ? (data.notes ?? undefined) : "截圖看起來不是運動紀錄。",
+        exercise: data.isExerciseData
+          ? {
+              type: data.exerciseType,
+              // 有時間沒日期時當作今天
+              startedAt: time ? `${date ?? today}T${time}` : undefined,
+              durationMin: data.durationSec ? Math.max(1, Math.round(data.durationSec / 60)) : undefined,
+              intensity: data.intensity ?? undefined,
+              kcal: round(data.kcal),
+              avgHeartRate: round(data.avgHeartRate),
+              maxHeartRate: round(data.maxHeartRate),
+              note: data.title ?? undefined,
             }
           : undefined,
       },

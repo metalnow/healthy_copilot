@@ -166,6 +166,7 @@ const PAGE_TIPS: { prefix: string; text: string; mood?: AssistantMood }[] = [
   { prefix: "/health/follow-ups", text: "安排好回診就按「已預約」，日期快到時我會提醒你。" },
   { prefix: "/health/goals", text: "展開「可以怎麼做」，看看飲食和生活上可以調整什麼。" },
   { prefix: "/log/activity", text: "可以直接上傳手錶 App（例如 CASIO LIFE LOG）的截圖，我幫你讀步數。" },
+  { prefix: "/log/exercise", text: "手錶的運動紀錄截圖可以直接匯入，我幫你讀時間、熱量和心率。" },
   { prefix: "/log/sleep", text: "手錶或 App 的睡眠截圖也可以直接匯入喔。" },
   { prefix: "/log/ai", text: "照片可以加一句感受，例如「吃完很撐」，分析時更能對照熱量和飽足感。" },
   { prefix: "/nutrition", text: "熱量是 AI 估算值，點進紀錄就可以自己修改喔。" },

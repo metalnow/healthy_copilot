@@ -222,6 +222,22 @@ export const ActivityScreenshotSchema = z.strictObject({
 });
 export type ActivityScreenshot = z.output<typeof ActivityScreenshotSchema>;
 
+export const ExerciseScreenshotSchema = z.strictObject({
+  isExerciseData: z.boolean().describe("截圖是否為一次運動的紀錄"),
+  exerciseType: z.enum(EXERCISE_TYPES).describe("運動類型；健身房、重訓為 strength，對不上的填 other"),
+  title: text().describe("截圖上的運動名稱原文，例如「健身房運動」；沒有填空字串"),
+  startDate: text().describe("開始日期 YYYY-MM-DD；沒有填空字串"),
+  startTime: text().describe("開始時間 HH:mm（24 小時制）；沒有填空字串"),
+  durationSec: positive().describe("運動時間（秒）；沒有填 0"),
+  kcal: positive().describe("運動消耗熱量 kcal；沒有填 0"),
+  avgHeartRate: positive().describe("平均心率；沒有填 0"),
+  maxHeartRate: positive().describe("最大心率；沒有填 0"),
+  intensity: enumOrNone(INTENSITIES).describe("依心率區間時間判斷的強度；無法判斷填 none"),
+  confidence: z.number().describe("整體信心 0–1"),
+  notes: text().describe("給使用者的補充；沒有填空字串"),
+});
+export type ExerciseScreenshot = z.output<typeof ExerciseScreenshotSchema>;
+
 export const MedicationLabelSchema = z.strictObject({
   isMedication: z.boolean().describe("照片是否為藥品、保健品的包裝、標籤或藥袋"),
   name: z.string().nullable().describe("品名（含規格，例如 Vitamin D3 1000 IU）"),

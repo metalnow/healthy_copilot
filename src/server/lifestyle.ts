@@ -158,6 +158,9 @@ export async function addExercise(
     durationMin: number;
     intensity?: (typeof INTENSITIES)[number];
     rpe?: number;
+    kcal?: number;
+    avgHeartRate?: number;
+    maxHeartRate?: number;
     afterMeal?: boolean;
     note?: string;
     source?: ObservationSource;
@@ -177,6 +180,9 @@ export async function addExercise(
       durationMin: input.durationMin,
       intensity: input.intensity,
       rpe: input.rpe,
+      kcal: input.kcal,
+      avgHeartRate: input.avgHeartRate,
+      maxHeartRate: input.maxHeartRate,
       afterMeal: input.afterMeal,
       note: input.note,
       source: input.source ?? "manual",
@@ -197,6 +203,9 @@ export async function updateExercise(
     durationMin: number;
     intensity?: (typeof INTENSITIES)[number];
     rpe?: number;
+    kcal?: number;
+    avgHeartRate?: number;
+    maxHeartRate?: number;
     afterMeal?: boolean;
     note?: string;
   },
@@ -209,6 +218,9 @@ export async function updateExercise(
       durationMin: input.durationMin,
       intensity: input.intensity ?? null,
       rpe: input.rpe ?? null,
+      kcal: input.kcal ?? null,
+      avgHeartRate: input.avgHeartRate ?? null,
+      maxHeartRate: input.maxHeartRate ?? null,
       afterMeal: input.afterMeal ?? null,
       note: input.note ?? null,
     })

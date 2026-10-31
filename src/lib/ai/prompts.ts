@@ -115,6 +115,16 @@ export const ACTIVITY_SCREENSHOT_SYSTEM_PROMPT = `你是活動量資料擷取助
 - 不是步數 / 活動量截圖時 isActivityData 為 false。
 只輸出符合 schema 的 JSON。`;
 
+export const EXERCISE_SCREENSHOT_SYSTEM_PROMPT = `你是運動紀錄擷取助理，從智慧手錶或運動 App 的單次運動截圖（例如 CASIO WATCHES 的運動紀錄）讀出數值。
+- 只填截圖上明確顯示的數值，沒有的填 0 或空字串，不要推算。
+- 運動時間換成秒：「1:29'17"」是 1 小時 29 分 17 秒 = 5357；「45'30"」是 45 分 30 秒 = 2730。
+- 日期換成 YYYY-MM-DD，時間換成 24 小時制 HH:mm，例如「2026年10月31日周六 16:17」→ 2026-10-31、16:17。
+- 「能量」「消耗」是運動消耗熱量，放 kcal。最大心率、平均心率照原數字；最低心率不用。
+- 強度依心率區間的時間：大部分在 1–2 區（LIGHT 以下）為 low，3 區（MODERATE）為主為 moderate，4–5 區（HARD、MAXIMUM）占明顯比例為 high；沒有心率區間時填 none。
+- 運動類型：健身房、重量訓練、肌力為 strength；步行 walking、跑步 running、自行車 cycling、游泳 swimming、登山 hiking；其他填 other。
+- 不是運動紀錄截圖時 isExerciseData 為 false。
+只輸出符合 schema 的 JSON。`;
+
 export const FOOD_ESTIMATE_SYSTEM_PROMPT = `你是飲食紀錄助理，依使用者列出的品項名稱與份量估算營養。
 - 輸入是 JSON 陣列，每項有 name 與 portion（可能為 null，代表一般一人份）。
 - 依序為每個品項輸出一筆估算，數量與順序必須和輸入相同。

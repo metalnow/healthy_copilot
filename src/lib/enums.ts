@@ -53,7 +53,7 @@ export const FOLLOW_UP_STATUSES = ["open", "scheduled", "done", "dismissed"] as 
 /** 追蹤事項來源：報告建議（AI 擷取）、檢驗異常、手動 */
 export const FOLLOW_UP_SOURCES = ["report", "finding", "manual"] as const;
 
-export const MEDIA_KINDS = ["health_report", "food_photo", "sleep_screenshot", "activity_screenshot", "medication_photo", "audio"] as const;
+export const MEDIA_KINDS = ["health_report", "food_photo", "sleep_screenshot", "activity_screenshot", "exercise_screenshot", "medication_photo", "audio"] as const;
 
 export const HEALTH_DOCUMENT_STATUSES = ["uploaded", "extracting", "review", "confirmed", "failed"] as const;
 
@@ -62,6 +62,7 @@ export const AI_TASKS = [
   "report_vision",
   "sleep_screenshot",
   "activity_screenshot",
+  "exercise_screenshot",
   "medication_label",
   "food_estimate",
   "voice_input",

@@ -186,6 +186,9 @@ export async function saveExercise(
   const durationMin = optionalInRange(formData, "durationMin", 1, 1440, "請輸入 1–1440 分鐘", errors);
   if (durationMin === undefined && !errors.durationMin) errors.durationMin = "請輸入運動時間";
   const rpe = optionalInRange(formData, "rpe", 1, 10, "請輸入 1–10", errors);
+  const kcal = optionalInRange(formData, "kcal", 0, 10000, "請輸入 0–10000 kcal", errors);
+  const avgHeartRate = optionalInRange(formData, "avgHeartRate", 30, 250, "請輸入 30–250", errors);
+  const maxHeartRate = optionalInRange(formData, "maxHeartRate", 30, 250, "請輸入 30–250", errors);
   const time = parseOccurredAt(formString(formData, "startedAt"), user.timezone, new Date());
   if ("error" in time) errors.startedAt = time.error;
   const note = formString(formData, "note")?.slice(0, 2000);
@@ -201,13 +204,24 @@ export async function saveExercise(
     durationMin,
     intensity: intensity.success ? intensity.data : undefined,
     rpe,
+    kcal,
+    avgHeartRate,
+    maxHeartRate,
     afterMeal: formData.get("afterMeal") === "on",
     note,
   };
   if (exerciseId) {
     return finishUpdate(db, user.id, "exercise.update", exerciseId, await updateExercise(db, user, exerciseId, values));
   }
-  const id = await addExercise(db, user, values);
+  // 從手錶截圖匯入：使用者確認後才把 AI 擷取紀錄標為已確認
+  const extractionId = formString(formData, "extractionId");
+  const extraction = extractionId ? await getExtraction(db, user.id, extractionId) : null;
+  const viaScreenshot =
+    extraction?.task === "exercise_screenshot" && (await settleExtraction(db, user.id, extraction.id, "confirmed"));
+  const id = await addExercise(db, user, {
+    ...values,
+    ...(viaScreenshot && { source: "screenshot" as const, extractionId: extraction.id, confidence: extraction.confidence ?? undefined }),
+  });
   await recordAudit(db, { userId: user.id, action: "exercise.create", entityId: id });
   redirect("/");
 }

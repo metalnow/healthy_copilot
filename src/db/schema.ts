@@ -533,6 +533,10 @@ export const exerciseSessions = sqliteTable(
     durationMin: real("duration_min").notNull(),
     intensity: text("intensity", { enum: INTENSITIES }),
     rpe: integer("rpe"),
+    /** 手錶記錄的運動消耗熱量與心率 */
+    kcal: real("kcal"),
+    avgHeartRate: integer("avg_heart_rate"),
+    maxHeartRate: integer("max_heart_rate"),
     afterMeal: bool("after_meal"),
     note: text("note"),
     source: text("source", { enum: OBSERVATION_SOURCES }).notNull().default("manual"),
