@@ -6,11 +6,18 @@
 // @ts-ignore `.open-next/worker.js` 於 `opennextjs-cloudflare build` 時產生
 import { default as handler } from "./.open-next/worker.js";
 import { handleQueue } from "./src/jobs/queue";
+import { EXPORT_PATH, handleExportRequest } from "./src/server/export";
 import { handleScheduled } from "./src/jobs/scheduled";
 import type { JobMessage } from "./src/jobs/types";
 
 export default {
-  fetch: handler.fetch,
+  fetch(request, env, ctx) {
+    // 資料匯出（可能數十 MB）直接串流回應，不經 Next.js，避免整份被緩衝在記憶體
+    if (request.method === "GET" && new URL(request.url).pathname === EXPORT_PATH) {
+      return handleExportRequest(request, env);
+    }
+    return handler.fetch(request, env, ctx);
+  },
 
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(handleScheduled(controller, env));
