@@ -10,6 +10,7 @@ import {
   isEncryptedBackup,
   parseArchive,
   remapRows,
+  streamArchive,
   type BackupContents,
 } from "./format";
 
@@ -87,5 +88,23 @@ describe("backup format", () => {
     expect(JSON.parse(statements[0].json)[0]).toEqual({ id: "r0", note: "x".repeat(100) });
     expect(() => buildInsertStatements("observations; DROP TABLE users", ["id"], rows)).toThrow();
     expect(() => buildInsertStatements("observations", ["id) --"], rows)).toThrow();
+  });
+});
+
+describe("streamArchive", () => {
+  it("串流產生的 ZIP 可以用 parseArchive 讀回，原始檔與檢查碼一致", async () => {
+    const tables = { "observations.json": [{ id: "o1", user_id: "u1" }] };
+    const media: Record<string, Uint8Array<ArrayBuffer>> = { m1: new Uint8Array([1, 2, 3, 4]) };
+    const stream = streamArchive({
+      manifest: { ...contents.manifest, includesMedia: true, mediaSkipped: 0 },
+      tables,
+      mediaIds: ["m1", "missing"],
+      loadMedia: async (id) => media[id] ?? null,
+    });
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    const parsed = await parseArchive(bytes);
+    expect(parsed.tables["observations.json"]).toEqual(tables["observations.json"]);
+    expect([...parsed.media.m1]).toEqual([1, 2, 3, 4]);
+    expect(parsed.manifest.mediaSkipped).toBe(1);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DriveClient, DriveError } from "./google-drive";
+import { DriveClient, DriveError, driveErrorCode } from "./google-drive";
 
 const json = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" }, ...init });
@@ -50,5 +50,14 @@ describe("DriveClient", () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("nope", { status: 401 }));
     await expect(new DriveClient("t", fetch).download("x")).rejects.toMatchObject({ status: 401 });
     await expect(new DriveClient("t", fetch).download("x")).rejects.toBeInstanceOf(DriveError);
+  });
+});
+
+describe("driveErrorCode", () => {
+  it("區分 API 未啟用、授權失效與其他錯誤", async () => {
+    expect(driveErrorCode(new DriveError(403, 'Drive API 403: {"reason":"accessNotConfigured"}'))).toBe("api_disabled");
+    expect(driveErrorCode(new DriveError(403, "Drive API 403: insufficientPermissions"))).toBe("forbidden");
+    expect(driveErrorCode(new DriveError(401, "Drive API 401"))).toBe("auth_expired");
+    expect(driveErrorCode(new Error("x"))).toBe("unknown");
   });
 });

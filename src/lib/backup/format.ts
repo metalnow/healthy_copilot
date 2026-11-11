@@ -2,7 +2,7 @@
 //   資料表原始列（D1 欄位名稱與值）→ JSON 檔 → ZIP（含 checksums.json）→ AES-256-GCM 加密
 //   加密檔格式：4 bytes 魔術字 "HCB1" + 12 bytes IV + 密文
 
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, Zip, ZipDeflate, ZipPassThrough, zipSync } from "fflate";
 import { fromBase64Url, randomBytes, sha256Hex, toBase64Url } from "@/lib/crypto";
 
 export const BACKUP_FORMAT_VERSION = 1;
@@ -80,6 +80,58 @@ export async function buildArchive(contents: BackupContents): Promise<Uint8Array
   }
   files["checksums.json"] = strToU8(JSON.stringify(checksums, null, 2));
   return zipSync(files, { level: 6 });
+}
+
+/**
+ * 串流產生與 buildArchive 相同格式的 ZIP：檔案逐一讀取、寫出，記憶體只需要容納最大的單一檔案。
+ * 原始檔（照片、PDF）本身已壓縮，直接存入不再壓縮，也省下 Worker 的 CPU 時間。
+ */
+export function streamArchive(input: {
+  manifest: BackupManifest;
+  tables: Record<string, Row[]>;
+  mediaIds: string[];
+  /** 讀取一個原始檔；找不到時回傳 null（略過並計入 mediaSkipped） */
+  loadMedia: (id: string) => Promise<Uint8Array<ArrayBuffer> | null>;
+}): ReadableStream<Uint8Array> {
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+  let zipError: Error | null = null;
+  const zip = new Zip((error, chunk) => {
+    if (error) zipError = error;
+    else writer.write(chunk).catch(() => {});
+  });
+  const checksums: Record<string, string> = {};
+
+  const add = async (name: string, bytes: Uint8Array<ArrayBuffer>, compress: boolean) => {
+    checksums[name] = await sha256Hex(bytes);
+    const entry = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
+    zip.add(entry);
+    entry.push(bytes, true);
+    if (zipError) throw zipError;
+    // 下載端較慢時等待，避免整份檔案堆在記憶體
+    await writer.ready;
+  };
+  const json = (value: unknown, pretty = false) =>
+    strToU8(pretty ? JSON.stringify(value, null, 2) : JSON.stringify(value)) as Uint8Array<ArrayBuffer>;
+
+  (async () => {
+    for (const { file } of BACKUP_TABLES) await add(file, json(input.tables[file] ?? []), true);
+    let skipped = input.manifest.mediaSkipped;
+    for (const id of input.mediaIds) {
+      const bytes = await input.loadMedia(id);
+      if (bytes) await add(`media/${id}`, bytes, false);
+      else skipped++;
+    }
+    await add("manifest.json", json({ ...input.manifest, mediaSkipped: skipped }, true), true);
+    const entry = new ZipDeflate("checksums.json", { level: 6 });
+    zip.add(entry);
+    entry.push(json(checksums, true), true);
+    zip.end();
+    if (zipError) throw zipError;
+    await writer.close();
+  })().catch((error) => writer.abort(error).catch(() => {}));
+
+  return readable;
 }
 
 export class BackupFormatError extends Error {

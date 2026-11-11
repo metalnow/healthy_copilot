@@ -6,6 +6,7 @@ import { userSettings } from "@/db/schema";
 import { requireUser } from "@/lib/auth/dal";
 import { backupHistory, KEEP_BACKUPS, listDriveBackups } from "@/server/backup";
 import { getDriveClient, isDriveConnected } from "@/server/google-drive";
+import { driveErrorCode } from "@/lib/google-drive";
 import {
   backupNow,
   deleteAccountAction,
@@ -26,6 +27,9 @@ const DRIVE_MESSAGES: Record<string, { text: string; ok?: boolean }> = {
   wrong_account: { text: "請使用與登入相同的 Google 帳號授權。" },
   scope_denied: { text: "沒有取得 Google Drive 權限，請重新連結並勾選允許。" },
   failed: { text: "連結 Google Drive 失敗，請再試一次。" },
+  denied: {
+    text: "Google 沒有完成授權：可能是在授權畫面按了取消，或 Google Cloud 的應用程式尚未發布、這個帳號不在測試使用者名單中。",
+  },
   invalid_state: { text: "授權流程已過期，請再試一次。" },
 };
 
@@ -33,6 +37,7 @@ const BACKUP_MESSAGES: Record<string, { text: string; ok?: boolean }> = {
   ok: { text: "備份完成。", ok: true },
   drive_not_connected: { text: "Google Drive 授權已失效，請重新連結。" },
   backup_failed: { text: "備份失敗，請稍後再試。" },
+  drive_api_disabled: { text: "Google Cloud 專案尚未啟用 Google Drive API，請到 Google Cloud Console 的「API 和服務」啟用後再試。" },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -66,18 +71,23 @@ export default async function DataSettingsPage({ searchParams }: PageProps<"/set
   ]);
 
   let driveBackups: { id: string; name: string; createdTime?: string; size?: string }[] | null = null;
-  let driveError = false;
+  let driveError: ReturnType<typeof driveErrorCode> | null = null;
   if (connected) {
     try {
       driveBackups = await listDriveBackups(await getDriveClient(db, env, user.id));
-    } catch {
-      driveError = true;
+    } catch (error) {
+      driveError = driveErrorCode(error);
+      console.warn("Drive list failed", { code: driveError });
     }
   }
 
   const tz = user.timezone;
+  const driveNotice = typeof params.drive === "string" ? DRIVE_MESSAGES[params.drive] : undefined;
   const notice =
-    (typeof params.drive === "string" && DRIVE_MESSAGES[params.drive]) ||
+    (driveNotice &&
+      (typeof params.code === "string"
+        ? { ...driveNotice, text: `${driveNotice.text}（錯誤代碼：${params.code.slice(0, 60)}）` }
+        : driveNotice)) ||
     (typeof params.backup === "string" && BACKUP_MESSAGES[params.backup]) ||
     undefined;
 
@@ -105,7 +115,14 @@ export default async function DataSettingsPage({ searchParams }: PageProps<"/set
                 </button>
               </form>
             </div>
-            {driveError && <p className="text-sm text-warning">無法讀取 Google Drive，授權可能已失效，請取消連結後重新連結。</p>}
+            {driveError && (
+              <p className="text-sm text-warning">
+                {driveError === "api_disabled"
+                  ? "Google Cloud 專案尚未啟用 Google Drive API，請到 Google Cloud Console 的「API 和服務 → 程式庫」啟用 Google Drive API。"
+                  : "無法讀取 Google Drive，授權可能已失效，請取消連結後重新連結。"}
+                <span className="ml-1 text-xs text-muted">（錯誤代碼：{driveError}）</span>
+              </p>
+            )}
           </>
         ) : (
           <a

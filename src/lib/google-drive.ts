@@ -18,6 +18,19 @@ export class DriveError extends Error {
   }
 }
 
+/**
+ * Drive 錯誤 → 給使用者的原因代碼（不含任何內容）：
+ * api_disabled：Google Cloud 專案沒有啟用 Google Drive API；auth_expired：授權失效；forbidden：其他權限問題。
+ */
+export function driveErrorCode(error: unknown): "api_disabled" | "auth_expired" | "forbidden" | "unknown" {
+  if (!(error instanceof DriveError)) return error instanceof Error && error.name === "DriveNotConnectedError" ? "auth_expired" : "unknown";
+  if (error.status === 401) return "auth_expired";
+  if (error.status === 403) {
+    return /accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(error.message) ? "api_disabled" : "forbidden";
+  }
+  return "unknown";
+}
+
 export class DriveClient {
   constructor(
     private readonly accessToken: string,

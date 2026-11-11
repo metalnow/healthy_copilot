@@ -17,7 +17,7 @@ import {
   type BackupContents,
   type Row,
 } from "@/lib/backup/format";
-import { DRIVE_ROOT_FOLDER, type DriveClient } from "@/lib/google-drive";
+import { DRIVE_ROOT_FOLDER, DriveError, driveErrorCode, type DriveClient } from "@/lib/google-drive";
 import { BackupFormatError } from "@/lib/backup/format";
 import { getDriveClient } from "./google-drive";
 import { getUserDataKey } from "./keys";
@@ -154,7 +154,15 @@ export async function runBackup(db: Db, env: Env, userId: string, trigger: "manu
       .where(eq(googleDriveBackups.id, record.id));
     return { id: record.id, ok: true as const };
   } catch (error) {
-    const message = error instanceof Error && error.name === "DriveNotConnectedError" ? "drive_not_connected" : "backup_failed";
+    const code = driveErrorCode(error);
+    const message =
+      error instanceof Error && error.name === "DriveNotConnectedError"
+        ? "drive_not_connected"
+        : code === "api_disabled"
+          ? "drive_api_disabled"
+          : "backup_failed";
+    // 只記錄錯誤類型與狀態碼，不含內容
+    console.warn("Backup failed", { code, status: error instanceof DriveError ? error.status : undefined });
     await db
       .update(googleDriveBackups)
       .set({ status: "failed", error: message, completedAt: new Date() })
