@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/dal";
 
@@ -42,6 +43,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
       <p className="text-xs text-muted">
         本系統為個人健康紀錄與分析輔助工具，非醫療診斷系統；所有 AI 推論僅供參考，請以醫師判斷為準。
+      </p>
+      <p className="flex gap-4 text-xs">
+        <Link href="/privacy" className="text-accent">
+          隱私權政策
+        </Link>
+        <Link href="/terms" className="text-accent">
+          服務條款
+        </Link>
       </p>
     </main>
   );
